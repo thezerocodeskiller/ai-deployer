@@ -42,7 +42,6 @@ module.exports = async (req, res) => {
     console.log("Request received for Gemini. Data:", tweetData);
 
     try {
-        // --- UPDATED PROMPT: Requesting an array of 5 suggestions ---
         const fullPrompt = `Task: Generate 5 creative and relevant memecoin Name and Ticker pairs from the provided context. Prioritize the image if present. Output ONLY a valid JSON array of objects.
         
         Context: 
@@ -66,24 +65,32 @@ module.exports = async (req, res) => {
 
         JSON Output: `;
         
-        const promptParts = [fullPrompt];
+        // --- THIS IS THE FIX ---
+        // The text prompt must be wrapped in a {text: ...} object to be a valid "Part".
+        const promptParts = [
+            { text: fullPrompt } 
+        ];
 
         if (tweetData.imageUrl) {
             const imagePart = await fetchImageAsBase64(tweetData.imageUrl);
-            if (imagePart) promptParts.push(imagePart);
+            if (imagePart) {
+                promptParts.push(imagePart); // imagePart is already a valid "Part" object
+            }
         }
 
         console.log("Sending request to Gemini for 5 options...");
+        
+        // The generateContent call itself was correct. The data inside was not.
         const result = await model.generateContent({ contents: [{ parts: promptParts }] });
         const text = result.response.text();
         console.log("Received from Gemini:", text);
 
-        // The response should now be an array
         const aiResponse = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
         res.status(200).json(aiResponse);
 
     } catch (error) {
-        console.error("Error during AI generation:", error);
+        // Log the full error for better debugging on the server side
+        console.error("Full error during AI generation:", error); 
         res.status(500).json({ error: "Failed to generate AI concept", details: error.message });
     }
 };
