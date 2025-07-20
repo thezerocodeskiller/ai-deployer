@@ -8,7 +8,7 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17";
+const MODEL_NAME = "gemini-1.5-flash-latest"; // Using the upgraded, more capable model
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -42,31 +42,45 @@ module.exports = async (req, res) => {
     console.log("Request received for Gemini. Data:", tweetData);
 
     try {
-        const fullPrompt = `Task: Generate 5 creative and relevant memecoin Name and Ticker pairs from the provided context. Prioritize the image if present. Output ONLY a valid JSON array of objects.
+        // --- THE NEW, HIGH-QUALITY PROMPT ---
+        const fullPrompt = `You are an expert memecoin creator and a crypto-native degen. Your goal is to analyze a tweet's content (text, quotes, and images) to find the most viral, funny, edgy, or absurd element and transform it into 5 high-quality, Solana-based memecoin concepts.
+
+        **Primary Directive: Find the Meme.**
+        Analyze the content with the following priority:
+        1.  **Image/Video Content:** The visual is the most powerful part. A picture of a cat in a hat is more important than the text "good morning." The primary concept MUST come from the visual if one exists.
+        2.  **Quoted Text & Headlines:** Direct quotes or headlines are often the most meme-worthy text.
+        3.  **Standout Phrases:** Look for short, punchy, ironic, or absurd phrases in the main tweet body.
+        4.  **Overall Vibe:** If the content is generic, capture the theme (e.g., politics, wholesome, crypto drama).
+
+        **Style Guide for Names:**
+        -   **Be Clever:** Use humor, irony, and cultural references.
+        -   **Be Edgy (but not hateful):** Memes often live on the edge. Dark humor is acceptable.
+        -   **Create Portmanteaus:** Combine words creatively (e.g., "Fiscal Farce").
+        -   **Keep it Punchy:** 1-3 words is ideal. Max 32 characters.
+        -   **IGNORE METADATA:** Do NOT use usernames, handles, URLs, hashtags, or "replying to" text. Focus only on the core content.
+
+        **Style Guide for Tickers:**
+        -   **Be Memorable:** Use clever abbreviations, phonetic spellings (like $WIF for "with"), or condensed words.
+        -   **Must be Uppercase & Short:** Max 10 characters.
+        -   The ticker should feel like a natural fit for the name.
+
+        **High-Quality Examples of What I Expect:**
+        -   For a tweet about a "white van abduction," you generate: {"name": "White Van", "ticker": "VAN"}
+        -   For a Babylon Bee article about debt, you generate: {"name": "Trillion Dollar Cut", "ticker": "TRILCUT"}
+        -   For a philosophical tweet "Love is evolved biotechnology," you generate: {"name": "Evolved Biotechnology", "ticker": "EVOBIO"}
+
+        **Tweet Content to Analyze:**
+        -   **Main Text:** "${tweetData.mainText}"
+        -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
+        -   **Media Attached:** ${tweetData.imageUrl ? 'Yes, an image is present and is the highest priority.' : 'No media.'}
+
+        **Your Task:**
+        Based on all the rules above, provide 5 diverse and high-quality concepts. The first result should be the absolute best and most viral option. Output ONLY a valid JSON array of objects. Do not write any other text or explanations.
+
+        JSON Output:
+        `;
         
-        Context: 
-        - Text: "${tweetData.mainText}" 
-        - Quoted Text: "${tweetData.quotedText || 'N/A'}" 
-        - Media Attached: ${tweetData.imageUrl || tweetData.videoUrl ? 'Yes' : 'No'}
-
-        Rules:
-        - Each Name should be 1-4 words, max 32 chars. Do not use @usernames.
-        - Each Ticker should be an uppercase acronym or condensed version of the name, max 10 chars.
-        - The very first result in the array should be the most direct and highest quality suggestion.
-
-        Example Output:
-        [
-            {"name": "Radical Left Lunatics", "ticker": "LUNATICS"},
-            {"name": "Trump Testimony", "ticker": "TRUMPTAPE"},
-            {"name": "Grand Jury", "ticker": "JURY"},
-            {"name": "Epstein Won't Satisfy", "ticker": "SATISFY"},
-            {"name": "Washington Times", "ticker": "WASHTIMES"}
-        ]
-
-        JSON Output: `;
-        
-        // --- THIS IS THE FIX ---
-        // The text prompt must be wrapped in a {text: ...} object to be a valid "Part".
+        // Correctly structure the prompt parts for the Gemini API
         const promptParts = [
             { text: fullPrompt } 
         ];
@@ -74,13 +88,12 @@ module.exports = async (req, res) => {
         if (tweetData.imageUrl) {
             const imagePart = await fetchImageAsBase64(tweetData.imageUrl);
             if (imagePart) {
-                promptParts.push(imagePart); // imagePart is already a valid "Part" object
+                promptParts.push(imagePart);
             }
         }
 
-        console.log("Sending request to Gemini for 5 options...");
+        console.log("Sending new expert prompt to Gemini for 5 options...");
         
-        // The generateContent call itself was correct. The data inside was not.
         const result = await model.generateContent({ contents: [{ parts: promptParts }] });
         const text = result.response.text();
         console.log("Received from Gemini:", text);
@@ -89,7 +102,6 @@ module.exports = async (req, res) => {
         res.status(200).json(aiResponse);
 
     } catch (error) {
-        // Log the full error for better debugging on the server side
         console.error("Full error during AI generation:", error); 
         res.status(500).json({ error: "Failed to generate AI concept", details: error.message });
     }
