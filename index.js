@@ -4,7 +4,7 @@ const axios = require('axios'); // We need this to fetch the image
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- CONFIGURATION ---
-const API_KEY = "AIzaSyA240WnSmytWudQBqSXO4eGDTycgB3QEUE"; // Make sure your API key is here
+const API_KEY = process.env.API_KEY; // Make sure your API key is here
 const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; // Optimized for speed and multimodal tasks
 
 // Initialize the Generative AI client
