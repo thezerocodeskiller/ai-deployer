@@ -43,42 +43,40 @@ module.exports = async (req, res) => {
 
     try {
         // --- THE NEW, HIGH-QUALITY PROMPT ---
-        const fullPrompt = `You are an expert memecoin creator and a crypto-native degen. Your goal is to analyze a tweet's content (text, quotes, and images) to find the most viral, funny, edgy, or absurd element and transform it into 5 high-quality, Solana-based memecoin concepts.
+        const fullPrompt = `You are a master memecoin creator and a crypto-native degen. Your sole purpose is to identify the single most viral, catchy, and culturally relevant phrase or concept within a tweet and build 5 diverse and high-quality Solana memecoin ideas around it.
 
-        **Primary Directive: Find the Meme.**
-        Analyze the content with the following priority:
-        1.  **Image/Video Content:** The visual is the most powerful part. A picture of a cat in a hat is more important than the text "good morning." The primary concept MUST come from the visual if one exists.
-        2.  **Quoted Text & Headlines:** Direct quotes or headlines are often the most meme-worthy text.
-        3.  **Standout Phrases:** Look for short, punchy, ironic, or absurd phrases in the main tweet body.
-        4.  **Overall Vibe:** If the content is generic, capture the theme (e.g., politics, wholesome, crypto drama).
+**The Golden Rules of Meme Selection:**
+1.  **QUOTED TEXT IS KING:** If the tweet text contains a phrase inside quotation marks (e.g., "INTO THE ETHER"), that phrase is ALWAYS the #1 priority for the name. It overrides everything else.
+2.  **IMAGE IS QUEEN:** If there is NO quoted text, the primary subject of the image or video becomes the priority.
+3.  **ABSURD PHRASES WIN:** If there is no media, find the most absurd, funny, or powerful short phrase in the main text.
 
-        **Style Guide for Names:**
-        -   **Be Clever:** Use humor, irony, and cultural references.
-        -   **Be Edgy (but not hateful):** Memes often live on the edge. Dark humor is acceptable.
-        -   **Create Portmanteaus:** Combine words creatively (e.g., "Fiscal Farce").
-        -   **Keep it Punchy:** 1-3 words is ideal. Max 32 characters.
-        -   **IGNORE METADATA:** Do NOT use usernames, handles, URLs, hashtags, or "replying to" text. Focus only on the core content.
+**Style Guide for Names:**
+-   **Strip Boilerplate:** Ignore generic text like "gm," "retweeted," collection numbers (#151/207), and "by @user". Focus on the core message.
+-   **Be Clever & Ironic:** Capture the cultural context. A satirical headline should have a satirical name.
+-   **Use Portmanteaus:** Creatively combine words (e.g., "Fiscal Farce" becomes $FISCAL).
+-   **Keep it Punchy:** 1-4 words is ideal. Max 32 characters.
+-   **IGNORE METADATA:** Absolutely no usernames, handles, URLs, or hashtags in the final name/ticker.
 
-        **Style Guide for Tickers:**
-        -   **Be Memorable:** Use clever abbreviations, phonetic spellings (like $WIF for "with"), or condensed words.
-        -   **Must be Uppercase & Short:** Max 10 characters.
-        -   The ticker should feel like a natural fit for the name.
+**Style Guide for Tickers:**
+-   **Be Creative:** Think phonetically ($WIF for "with"), use memorable acronyms, or create clever, condensed words.
+-   **Must Relate Directly to the Name.**
+-   **Must be Uppercase & Short:** Max 10 characters.
 
-        **High-Quality Examples of What I Expect:**
-        -   For a tweet about a "white van abduction," you generate: {"name": "White Van", "ticker": "VAN"}
-        -   For a Babylon Bee article about debt, you generate: {"name": "Trillion Dollar Cut", "ticker": "TRILCUT"}
-        -   For a philosophical tweet "Love is evolved biotechnology," you generate: {"name": "Evolved Biotechnology", "ticker": "EVOBIO"}
+**PERFECT EXAMPLE (Your Use Case):**
+-   For a tweet: 'gm "INTO THE ETHER #151/207" by @beeple' with an image of an Ether crystal.
+-   CORRECT OUTPUT #1: {"name": "Into The Ether", "ticker": "ETHER"}
+-   INCORRECT OUTPUT: {"name": "Eth Crystal Planet", "ticker": "ETHCP"} (This wrongly prioritized the image over the explicit quote).
 
-        **Tweet Content to Analyze:**
-        -   **Main Text:** "${tweetData.mainText}"
-        -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
-        -   **Media Attached:** ${tweetData.imageUrl ? 'Yes, an image is present and is the highest priority.' : 'No media.'}
+**Tweet Content to Analyze:**
+-   **Main Text:** "${tweetData.mainText}"
+-   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
+-   **Media Attached:** ${tweetData.imageUrl ? 'Yes, an image is present.' : 'No media.'}
 
-        **Your Task:**
-        Based on all the rules above, provide 5 diverse and high-quality concepts. The first result should be the absolute best and most viral option. Output ONLY a valid JSON array of objects. Do not write any other text or explanations.
+**Your Task:**
+Based on all the rules above, provide 5 diverse and high-quality concepts. The first result must be the absolute best option according to the Golden Rules. Output ONLY a valid JSON array of objects.
 
-        JSON Output:
-        `;
+JSON Output:
+`;
         
         // Correctly structure the prompt parts for the Gemini API
         const promptParts = [
