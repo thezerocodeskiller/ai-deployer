@@ -1,25 +1,20 @@
-// This is now a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
-const Anthropic = require("@anthropic-ai/sdk"); // <-- CHANGED: Import Anthropic
+const Anthropic = require("@anthropic-ai/sdk");
 
-// --- CONFIGURATION ---
-// IMPORTANT: You will create this environment variable in your Vercel settings
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 if (!ANTHROPIC_API_KEY) {
     throw new Error("FATAL ERROR: ANTHROPIC_API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "claude-3-haiku-20240307"; // <-- CHANGED: Use the Haiku model
+const MODEL_NAME = "claude-3-haiku-20240307";
 
 const anthropic = new Anthropic({
     apiKey: ANTHROPIC_API_KEY,
 });
 
-// --- MODIFIED HELPER FUNCTION: Fetches and converts image for Claude ---
 async function fetchImageAsBase64(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        // Claude expects a specific format for image data
         return {
             type: 'image',
             source: {
@@ -34,9 +29,7 @@ async function fetchImageAsBase64(imageUrl) {
     }
 }
 
-// --- MAIN HANDLER FUNCTION ---
 module.exports = async (req, res) => {
-    // Set up CORS headers
     await new Promise((resolve, reject) => {
         cors()(req, res, (result) => (result instanceof Error ? reject(result) : resolve(result)));
     });
@@ -49,12 +42,11 @@ module.exports = async (req, res) => {
     console.log("Request received for Claude. Data:", tweetData);
 
     try {
-        // --- PROMPT CONSTRUCTION FOR CLAUDE ---
-        // 1. The System Prompt contains the core instructions
         const systemPrompt = `Task: Generate a memecoin Name and Ticker from the provided context. Prioritize the image if present. Output ONLY a valid JSON object. Context is provided in the user message. Rules: - Name: Highest priority is the image's subject. Second priority is a standout phrase from the text. 1-4 words, max 32 chars. No @usernames or metadata. - Ticker: If text has $XXXX, use XXXX. If name is 3+ words, use acronym. Otherwise, combine words, uppercase, and truncate to 10 chars. Example Output: {"name": "Monad Bankruptcy", "ticker": "MONADBANKR"} JSON Output: `;
 
-        // 2. The User Content contains the data (text and optional image)
-        const userContent = [
+        // --- CORRECTED LOGIC ---
+        // The user message content must be an array that holds both the text and the image objects.
+        const userMessageContent = [
             {
                 type: 'text',
                 text: `Here is the content to analyze: - Text: "${tweetData.mainText}" - Quoted Text: "${tweetData.quotedText || 'N/A'}"`
@@ -64,24 +56,24 @@ module.exports = async (req, res) => {
         if (tweetData.imageUrl) {
             const imagePart = await fetchImageAsBase64(tweetData.imageUrl);
             if (imagePart) {
-                userContent.push(imagePart); // Add the formatted image data
+                // Push the image directly into the same content array
+                userMessageContent.push(imagePart);
             }
         }
 
         console.log("Sending request to Claude Haiku...");
         
-        // 3. The API Call
         const response = await anthropic.messages.create({
             model: MODEL_NAME,
             max_tokens: 1024,
             system: systemPrompt,
             messages: [{
                 role: 'user',
-                content: userContent
+                // The 'content' key should now hold the array with both text and image
+                content: userMessageContent 
             }]
         });
 
-        // 4. Extract the response text
         const text = response.content[0].text;
         console.log("Received from Claude:", text);
 
@@ -90,6 +82,10 @@ module.exports = async (req, res) => {
 
     } catch (error) {
         console.error("Error during AI generation with Claude:", error);
-        res.status(500).json({ error: "Failed to generate AI concept" });
+        // Provide a more detailed error response during development
+        res.status(500).json({ 
+            error: "Failed to generate AI concept",
+            details: error.message 
+        });
     }
 };
