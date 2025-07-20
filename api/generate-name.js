@@ -8,7 +8,7 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+const MODEL_NAME = "gemini-1.5-flash-latest"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -42,7 +42,7 @@ module.exports = async (req, res) => {
     console.log("Request received for Gemini. Data:", tweetData);
 
     try {
-        // --- THE MASTERCLASS MEMECOIN GENERATION PROMPT ---
+        // --- UPDATED PROMPT: Requesting a single best concept ---
         const fullPrompt = `You are 'AlphaOracle', a legendary memecoin creator with a decade of experience in the crypto trenches. You operate with a single mandate: to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts. You are not a generic chatbot; you are a degen philosopher, a meme strategist, and a master of crypto-native language. Your outputs must be sharp, insightful, and ready for immediate deployment.
 
         **//-- CORE PHILOSOPHY: SIGNAL VS. NOISE --//**
@@ -108,6 +108,7 @@ module.exports = async (req, res) => {
 
         JSON Output:
         `;
+
         
         const promptParts = [
             { text: fullPrompt } 
@@ -120,7 +121,7 @@ module.exports = async (req, res) => {
             }
         }
 
-        console.log("Sending Masterclass prompt to Gemini...");
+        console.log("Sending Masterclass prompt to Gemini for ONE option...");
         
         const result = await model.generateContent({ contents: [{ parts: promptParts }] });
         const text = result.response.text();
