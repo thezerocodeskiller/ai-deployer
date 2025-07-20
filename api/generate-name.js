@@ -1,91 +1,69 @@
+// This is now a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
-const Anthropic = require("@anthropic-ai/sdk");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-if (!ANTHROPIC_API_KEY) {
-    throw new Error("FATAL ERROR: ANTHROPIC_API_KEY is not set in environment variables.");
+// --- CONFIGURATION ---
+const API_KEY = process.env.API_KEY;
+if (!API_KEY) {
+    throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "claude-3-haiku-20240307";
+const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17";
 
-const anthropic = new Anthropic({
-    apiKey: ANTHROPIC_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(API_KEY);
+const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
+// --- HELPER FUNCTION: Fetches and converts image ---
 async function fetchImageAsBase64(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        return {
-            type: 'image',
-            source: {
-                type: 'base64',
-                media_type: response.headers['content-type'],
-                data: Buffer.from(response.data).toString('base64'),
-            },
-        };
+        return { inlineData: { data: Buffer.from(response.data).toString('base64'), mimeType: response.headers['content-type'] } };
     } catch (error) {
         console.error("Error fetching image:", error.message);
         return null;
     }
 }
 
+// --- MAIN HANDLER FUNCTION ---
+// This is the function Vercel will run when the endpoint is called.
 module.exports = async (req, res) => {
+    // Set up CORS headers manually for the serverless environment
     await new Promise((resolve, reject) => {
-        cors()(req, res, (result) => (result instanceof Error ? reject(result) : resolve(result)));
+        cors()(req, res, (result) => {
+            if (result instanceof Error) {
+                return reject(result);
+            }
+            return resolve(result);
+        });
     });
 
+    // We only accept POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     const tweetData = req.body;
-    console.log("Request received for Claude. Data:", tweetData);
+    console.log("Request received. Data:", tweetData);
 
     try {
-        const systemPrompt = `Task: Generate a memecoin Name and Ticker from the provided context. Prioritize the image if present. Output ONLY a valid JSON object. Context is provided in the user message. Rules: - Name: Highest priority is the image's subject. Second priority is a standout phrase from the text. 1-4 words, max 32 chars. No @usernames or metadata. - Ticker: If text has $XXXX, use XXXX. If name is 3+ words, use acronym. Otherwise, combine words, uppercase, and truncate to 10 chars. Example Output: {"name": "Monad Bankruptcy", "ticker": "MONADBANKR"} JSON Output: `;
+        const fullPrompt = `Task: Generate a memecoin Name and Ticker from the provided context. Prioritize the image if present. Output ONLY a valid JSON object. Context: - Text: "${tweetData.mainText}" - Quoted Text: "${tweetData.quotedText || 'N/A'}" - Media Attached: ${tweetData.imageUrl || tweetData.videoUrl ? 'Yes' : 'No'} Rules: - Name: Highest priority is the image's subject. Second priority is a standout phrase from the text. 1-4 words, max 32 chars. No @usernames or metadata. - Ticker: If text has $XXXX, use XXXX. If name is 3+ words, use acronym. Otherwise, combine words, uppercase, and truncate to 10 chars. Example Output: {"name": "Monad Bankruptcy", "ticker": "MONADBANKR"} JSON Output: `;
+        const promptParts = [fullPrompt];
 
-        // --- CORRECTED LOGIC ---
-        // The user message content must be an array that holds both the text and the image objects.
-        const userMessageContent = [
-            {
-                type: 'text',
-                text: `Here is the content to analyze: - Text: "${tweetData.mainText}" - Quoted Text: "${tweetData.quotedText || 'N/A'}"`
-            }
-        ];
-        
         if (tweetData.imageUrl) {
             const imagePart = await fetchImageAsBase64(tweetData.imageUrl);
-            if (imagePart) {
-                // Push the image directly into the same content array
-                userMessageContent.push(imagePart);
-            }
+            if (imagePart) promptParts.push(imagePart);
         }
 
-        console.log("Sending request to Claude Haiku...");
-        
-        const response = await anthropic.messages.create({
-            model: MODEL_NAME,
-            max_tokens: 1024,
-            system: systemPrompt,
-            messages: [{
-                role: 'user',
-                // The 'content' key should now hold the array with both text and image
-                content: userMessageContent 
-            }]
-        });
-
-        const text = response.content[0].text;
-        console.log("Received from Claude:", text);
+        console.log("Sending request to Gemini...");
+        const result = await model.generateContent(promptParts);
+        const text = result.response.text();
+        console.log("Received from Gemini:", text);
 
         const aiResponse = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
         res.status(200).json(aiResponse);
 
     } catch (error) {
-        console.error("Error during AI generation with Claude:", error);
-        // Provide a more detailed error response during development
-        res.status(500).json({ 
-            error: "Failed to generate AI concept",
-            details: error.message 
-        });
+        console.error("Error during AI generation:", error);
+        res.status(500).json({ error: "Failed to generate AI concept" });
     }
 };
