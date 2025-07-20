@@ -10,8 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@google-cloud/vertexai": "^1.10.0",
-    "@google/generative-ai": "^0.24.1",
+    "@anthropic-ai/sdk": "^0.56.0",
     "axios": "^1.10.0",
     "cors": "^2.8.5",
     "express": "^5.1.0"
