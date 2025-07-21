@@ -1,4 +1,4 @@
-console.log("Uxento AI Sniper v18: Bulletproof Extractor Patch");
+console.log("Uxento AI Sniper v16: Injection Core Fixed");
 
 // --- Helper Functions ---
 function simulateTyping(inputElement, text) {
@@ -9,29 +9,27 @@ function simulateTyping(inputElement, text) {
     inputElement.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-// --- NEW BULLETPROOF DATA EXTRACTION FUNCTION ---
+// --- DATA EXTRACTION FUNCTION (Reverted to a more stable version) ---
 function extractTweetData(tweetElement) {
     const data = { 
         mainText: '', 
         quotedText: '', 
         author: '',
         twitterUrl: '',
-        mainImageUrls: [], // Now an array for multiple images
+        mainImageUrl: null,
         profileImageUrl: null,
         isContentTweet: true
     };
     
-    // Check for non-content tweets (e.g., follow notifications)
     if (tweetElement.querySelector('svg.lucide-user-plus, svg.lucide-user-minus')) {
         data.isContentTweet = false;
         return data;
     }
-
-    const article = tweetElement.querySelector('article');
-    if (!article) return data; // If no article, can't process
     
-    // --- Author and Profile Image Extraction ---
-    const authorHeader = article.querySelector('div[class*="flex items-center gap-3 p-4"]');
+    const viewLink = tweetElement.querySelector('a[href*="/status/"]');
+    if (viewLink) data.twitterUrl = viewLink.href;
+
+    const authorHeader = tweetElement.querySelector('div[class*="flex items-center gap-3 p-4"]');
     if (authorHeader) {
         const authorLink = authorHeader.querySelector('a[href^="https://x.com/"]');
         if (authorLink) data.author = authorLink.href.split('/').pop().toLowerCase();
@@ -42,53 +40,33 @@ function extractTweetData(tweetElement) {
         }
     }
     
-    // --- Robust Text Extraction ---
-    // Function to get clean inner text without mentions
-    const getCleanText = (element) => {
-        if (!element) return '';
-        // Clone the node to avoid modifying the live DOM
-        const clone = element.cloneNode(true);
-        // Remove all user mention links from the clone
-        clone.querySelectorAll('a[href^="https://x.com/"]').forEach(mention => mention.remove());
-        return clone.innerText.trim();
-    };
+    const mainTextElement = tweetElement.querySelector('div[class*="px-4 pb-4 text-sm leading-relaxed"]');
+    if (mainTextElement) data.mainText = mainTextElement.innerText.trim();
 
-    // The main text is the direct text content of the reply/tweet
-    const mainTextElement = article.querySelector('div[class*="px-4 pb-4 text-sm leading-relaxed"]');
-    data.mainText = getCleanText(mainTextElement);
-
-    // The quoted text is inside the nested grey box
-    const quotedTweetContainer = article.querySelector('div[class*="mx-4 mb-4 p-3 rounded-md"]');
+    const quotedTweetContainer = tweetElement.querySelector('div[class*="mx-4 mb-4 p-3 rounded-md"]');
     if (quotedTweetContainer) {
         const quotedTextElement = quotedTweetContainer.querySelector('div[class*="text-xs leading-relaxed"]');
-        data.quotedText = getCleanText(quotedTextElement);
+        if (quotedTextElement) data.quotedText = quotedTextElement.innerText.trim();
     }
     
-    // --- Multi-Image & URL Extraction ---
-    const viewLink = article.querySelector('a[href*="/status/"][target="_blank"]');
-    if (viewLink) data.twitterUrl = viewLink.href;
-
-    // Use querySelectorAll to find ALL images, not just the first one.
-    // This works for single images, multiple images, and images in quotes.
-    const imageElements = article.querySelectorAll('img.cursor-zoom-in');
+    // Simplified and more robust image search
+    let mainImage = tweetElement.querySelector('img.cursor-zoom-in');
+    if (!mainImage) {
+        const photoLink = tweetElement.querySelector('a[href*="/photo/"]');
+        if (photoLink) mainImage = photoLink.querySelector('img');
+    }
     
-    if (imageElements.length > 0) {
-        imageElements.forEach(img => {
-            if (img.src) {
-                data.mainImageUrls.push(img.src);
-            }
-        });
+    if (mainImage) {
+        data.mainImageUrl = mainImage.src;
     } else {
-        // Fallback for video posters
-        const videoElement = article.querySelector('video');
+        const videoElement = tweetElement.querySelector('video');
         if (videoElement && videoElement.poster) {
-            data.mainImageUrls.push(videoElement.poster);
+            data.mainImageUrl = videoElement.poster;
         }
     }
 
     return data;
 }
-
 
 // --- HTML Template for the UI Panel ---
 function getCreationFormTemplate(cardId) {
@@ -97,7 +75,7 @@ function getCreationFormTemplate(cardId) {
             <div><label style="font-size: 12px; color: #a1a1aa; display: block; margin-bottom: 4px;">Name</label><input type="text" id="name-${cardId}" class="ai-input-name" placeholder="Select a suggestion..." style="width: 100%; background-color: #27272a; border: 1px solid #52525b; border-radius: 4px; color: #f4f4f5; padding: 8px; font-size: 14px;"></div>
             <div><label style="font-size: 12px; color: #a1a1aa; display: block; margin-bottom: 4px;">Ticker</label><input type="text" id="ticker-${cardId}" class="ai-input-ticker" placeholder="..." style="width: 100%; background-color: #27272a; border: 1px solid #52525b; border-radius: 4px; color: #f4f4f5; padding: 8px; font-size: 14px;"></div>
             <div style="flex-grow: 1;"><label style="font-size: 12px; color: #a1a1aa; display: block; margin-bottom: 8px;">AI Suggestions (Click to Insta-Create)</label><ul id="suggestions-${cardId}" class="ai-suggestions-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; max-height: 2000px; overflow-y: auto;"><li style="color: #a1a1aa; text-align: center; font-size: 13px;">✨ Consulting the Oracle...</li></ul></div>
-            <div><label style="font-size: 12px; color: #a1a1aa; display: block; margin-bottom: 4px;">Buy Amount (SOL)</label><input type="text" id="amount-${cardId}" class="ai-input-amount" value="0.8" style="width: 100%; background-color: #27272a; border: 1px solid #52525b; border-radius: 4px; color: #f4f4f5; padding: 8px; font-size: 14px;"></div>
+            <div><label style="font-size: 12px; color: #a1a1aa; display: block; margin-bottom: 4px;">Buy Amount (SOL)</label><input type="text" id="amount-${cardId}" class="ai-input-amount" value="1" style="width: 100%; background-color: #27272a; border: 1px solid #52525b; border-radius: 4px; color: #f4f4f5; padding: 8px; font-size: 14px;"></div>
             <button id="create-${cardId}" class="ai-final-create-button" disabled style="padding: 10px 12px; border: none; background-color: #3f3f46; color: #a1a1aa; border-radius: 4px; cursor: not-allowed; font-weight: 600; font-size: 14px; text-align: center; width: 100%; margin-top: auto;">Create Manually</button>
         </div>
     `;
@@ -111,11 +89,7 @@ async function handleDirectAPICreate(cardId, tweetDataForAPI) {
         const name = document.getElementById(`name-${cardId}`).value;
         const ticker = document.getElementById(`ticker-${cardId}`).value;
         const amount = document.getElementById(`amount-${cardId}`).value;
-        
-        // Use the first image for the create API, as it likely only accepts one.
-        const imageForApi = tweetDataForAPI.mainImageUrls.length > 0 ? tweetDataForAPI.mainImageUrls[0] : null;
-
-        const payload = { name, symbol: ticker, twitter: tweetDataForAPI.twitterUrl, image: imageForApi, amount: parseFloat(amount), astralTip: 0.002 };
+        const payload = { name, symbol: ticker, twitter: tweetDataForAPI.twitterUrl, image: tweetDataForAPI.mainImageUrl, amount: parseFloat(amount), astralTip: 0.002 };
         console.log("Sending final payload to Uxento API:", payload);
         const response = await fetch('https://eu-dev.uxento.io/api/v1/create/bonk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), credentials: 'include' });
         if (!response.ok) { const errorData = await response.json(); throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`); }
@@ -132,31 +106,36 @@ async function handleDirectAPICreate(cardId, tweetDataForAPI) {
 async function processTweetCard(tweetElement) {
     if (tweetElement.dataset.aiFormInjected === 'true') return;
 
+    // We must ensure there's an article to work with before proceeding.
     const articleElement = tweetElement.querySelector('article');
     if (!articleElement) return;
 
     const fullTweetData = extractTweetData(tweetElement);
-
-    // Stop processing if data extraction failed or it's a non-content tweet
-    if (!fullTweetData.isContentTweet || !fullTweetData.author) {
-        tweetElement.dataset.aiFormInjected = 'true'; // Mark as processed to avoid loops
+    if (!fullTweetData.isContentTweet) {
+        tweetElement.dataset.aiFormInjected = 'true';
         return;
     }
     
     tweetElement.dataset.aiFormInjected = 'true';
     const cardId = Date.now() + Math.random().toString(36).substring(2, 9);
     
+    // --- THIS IS THE FIX ---
+    // We now find the button and hide it if it exists,
+    // but its absence will NOT stop the script.
     const originalCreateButton = tweetElement.querySelector('button.bg-blue-600\\/80');
     if (originalCreateButton) {
         originalCreateButton.style.display = 'none';
     }
     
-    const tweetDataForAI = { ...fullTweetData };
     const tweetDataForAPI = { ...fullTweetData };
-    if (tweetDataForAPI.mainImageUrls.length === 0 && tweetDataForAPI.profileImageUrl) {
-        tweetDataForAPI.mainImageUrls.push(tweetDataForAPI.profileImageUrl);
+    if (!tweetDataForAPI.mainImageUrl && tweetDataForAPI.profileImageUrl) {
+        tweetDataForAPI.mainImageUrl = tweetDataForAPI.profileImageUrl;
     }
-    
+    const tweetDataForAI = { ...fullTweetData };
+    if (!tweetDataForAI.mainImageUrl) {
+        delete tweetDataForAI.mainImageUrl;
+    }
+
     tweetElement.style.display = 'flex';
     articleElement.style.flex = '1 1 0%';
     articleElement.style.minWidth = '0'; 
@@ -220,6 +199,7 @@ async function processTweetCard(tweetElement) {
     }
 }
 
+
 // --- Observer ---
 function observeDOMChanges() {
     const observer = new MutationObserver((mutations) => {
@@ -235,7 +215,10 @@ function observeDOMChanges() {
             }
         }
     });
+
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Initial run for any cards already on the page
     document.querySelectorAll('[data-card="true"]').forEach(processTweetCard);
 }
 
