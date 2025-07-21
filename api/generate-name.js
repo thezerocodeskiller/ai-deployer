@@ -8,7 +8,7 @@ const API_KEY = process.env.XAI_API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: XAI_API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "grok-4";  // Confirm in xAI docs; may be 'grok-4' or similar
+const MODEL_NAME = "grok-3-fast";  // Confirm in xAI docs; may be 'grok-4' or similar
 
 const openai = new OpenAI({
     apiKey: API_KEY,
