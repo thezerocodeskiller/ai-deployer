@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Uxento AI Creator",
+  "version": "1.1",
+  "description": "Generates a meme coin name and ticker from a tweet on Uxento.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://uxento.io/*",
+    "https://www.uxento.io/*",
+    "https://generativelanguage.googleapis.com/"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://uxento.io/*",
+        "https://www.uxento.io/*"
+      ],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

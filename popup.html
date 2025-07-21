@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Uxento AI Creator Settings</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; width: 350px; padding: 16px; background-color: #18181b; color: #f4f4f5; font-size: 14px; }
+        h3 { margin: 0 0 16px; color: #e4e4e7; border-bottom: 1px solid #3f3f46; padding-bottom: 8px; }
+        h4 { margin: 16px 0 8px; font-size: 15px; color: #a1a1aa; }
+        .setting { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .setting label { cursor: pointer; }
+        /* Prompt Section */
+        #prompt-section { margin-top: 16px; border-top: 1px solid #3f3f46; padding-top: 16px; }
+        #custom-prompt { width: 100%; height: 200px; background-color: #27272a; border: 1px solid #52525b; border-radius: 4px; color: #f4f4f5; padding: 8px; font-size: 13px; font-family: monospace; resize: vertical; box-sizing: border-box;}
+        #save-prompt-btn { width: 100%; padding: 8px 12px; border: none; background-color: #16a34a; color: white; border-radius: 4px; cursor: pointer; font-weight: 600; margin-top: 8px; }
+        #save-status { font-size: 12px; color: #16a34a; text-align: center; height: 16px; margin-top: 4px; }
+        /* Other styles remain the same */
+        #sniper-list { list-style: none; padding: 0; margin: 0 0 16px; max-height: 120px; overflow-y: auto; background-color: #27272a; border-radius: 6px; }
+        #sniper-list li { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid #3f3f46; }
+        .remove-btn { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 16px; }
+        .add-sniper { display: flex; gap: 8px; }
+        #sniper-username { flex-grow: 1; padding: 6px 8px; border: 1px solid #52525b; background-color: #3f3f46; border-radius: 4px; color: #f4f4f5; }
+        #add-sniper-btn { padding: 6px 12px; border: none; background-color: #4f46e5; color: white; border-radius: 4px; cursor: pointer; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3f3f46; transition: .4s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #4f46e5; }
+        input:checked + .slider:before { transform: translateX(18px); }
+        input:checked + .slider.danger { background-color: #ef4444; }
+    </style>
+</head>
+<body>
+    <h3>AI Creator Settings</h3>
+    <div class="setting">
+        <label for="sniperModeToggle"><strong>Sniper Mode</strong></label>
+        <label class="switch">
+            <input type="checkbox" id="sniperModeToggle">
+            <span class="slider danger"></span>
+        </label>
+    </div>
+    <div class="setting">
+        <label for="autoCreateToggle">Insta-Create (Manual Clicks)</label>
+        <label class="switch">
+            <input type="checkbox" id="autoCreateToggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <div id="sniper-section">
+        <h4>Sniper List</h4>
+        <ul id="sniper-list"></ul>
+        <div class="add-sniper">
+            <input type="text" id="sniper-username" placeholder="Add user (e.g., elonmusk)">
+            <button id="add-sniper-btn">Add</button>
+        </div>
+    </div>
+
+    <div id="prompt-section">
+        <h4>Custom Prompt</h4>
+        <textarea id="custom-prompt"></textarea>
+        <button id="save-prompt-btn">Save Prompt</button>
+        <div id="save-status"></div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
