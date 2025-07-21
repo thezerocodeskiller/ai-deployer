@@ -1,3 +1,5 @@
+// This is the complete and final server file with the best prompt yet.
+
 const cors = require('cors');
 const axios = require('axios');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -5,14 +7,14 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // --- CONFIGURATION ---
 const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
-    throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
+    throw new Error("FATAL ERROR: API_KEY (Google) is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17";
+const MODEL_NAME = "gemini-1.5-flash-latest";
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
-// --- MIDDLEWARE & HELPERS (No changes) ---
+// --- MIDDLEWARE SETUP & HELPERS (No changes) ---
 const corsMiddleware = cors();
 const runMiddleware = (req, res, fn) => new Promise((resolve, reject) => fn(req, res, (result) => result instanceof Error ? reject(result) : resolve(result)));
 async function fetchImageAsBase64(imageUrl) {
@@ -29,83 +31,63 @@ async function fetchImageAsBase64(imageUrl) {
 module.exports = async (req, res) => {
     await runMiddleware(req, res, corsMiddleware);
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+    if (req.method === 'OPTIONS') { return res.status(200).end(); }
+    if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini. Data:", tweetData);
+    console.log("Request received for Final Gemini Prompt. Data:", tweetData);
 
     try {
-        // --- THE CLEANED PROMPT ---
-        const fullPrompt = `You are 'AlphaOracle', a legendary memecoin creator with a decade of experience in the crypto trenches. You operate with a single mandate: to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts. You are not a generic chatbot; you are a degen philosopher, a meme strategist, and a master of crypto-native language. Your outputs must be sharp, insightful, and ready for immediate deployment.
+        // --- The Final "AlphaOracle" Prompt v2 ---
+        const fullPrompt = `You are 'AlphaOracle', a legendary memecoin creator. Your task is to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts. Your outputs must be sharp, insightful, and ready for immediate deployment. You must filter out all noise (usernames, generic phrases, URLs) and focus only on the core signal.
 
-        **//-- CORE PHILOSOPHY: SIGNAL VS. NOISE --//**
-
-        Your primary task is to differentiate signal from noise.
-        -   **SIGNAL** is the raw, exploitable core of the meme. It is the punchline, the absurdity, the cultural touchstone, the powerful image, the direct quote.
-        -   **NOISE** is everything else. It is generic pleasantries ("gm", "good night"), usernames, URLs, hashtags, timestamps, retweet notifications, and "replying to" context. You must filter out all noise with surgical precision.
-
-        **//-- THE UNBREAKABLE LAWS OF MEME SELECTION --//**
-
-        You will analyze the provided tweet data according to this strict, non-negotiable hierarchy of importance:
+        **//-- THE UNBREAKABLE LAWS OF NAME SELECTION --//**
+        You will analyze the provided data according to this strict hierarchy:
 
         **LAW 1: THE LAW OF QUOTATION (ABSOLUTE PRIORITY)**
-        If the main tweet text contains a phrase enclosed in **"quotation marks"** (e.g., "INTO THE ETHER"), that phrase is the **ALPHA SIGNAL**. It is a 100x signal that MUST be the primary concept for your #1 suggestion. It overrides all other laws. You will strip any surrounding noise (like "gm" or collection numbers) and use the quoted text as the core idea.
+        If the main text contains a phrase in **"quotation marks"**, that phrase is the ALPHA SIGNAL and MUST be the primary concept. It overrides all other laws.
 
-        **LAW 2: THE LAW OF THE IMAGE (VISUAL DOMINANCE)**
-        If there is **NO quoted text**, the visual content (image or video) is the next highest priority. You must identify the most dominant, funny, or strange subject in the media. A weird-looking dog in a photo is infinitely more important than the text "check out this pic." Your concepts should revolve around what is *seen*.
+        **LAW 2: THE LAW OF THE NAMED ENTITY (HIGH PRIORITY)**
+        If no quote exists, look for a named subject, especially one introduced with words like "Meet...", "This is...", or a capitalized proper noun. (e.g., "Meet Hero, the latest buddy..."). This is strong signal.
 
-        **LAW 3: THE LAW OF THE ABSURD (TEXT-ONLY GOLD)**
-        If there is no quoted text and no media, you will scan the tweet's text for the most absurd, ironic, hilarious, or politically charged phrase. Look for powerful statements, contradictions, or simple, punchy phrases that can stand alone as a meme.
+        **LAW 3: THE LAW OF THE IMAGE (VISUAL DOMINANCE)**
+        If no quote or named entity, the visual content is the next priority. The concept should revolve around what is *seen* in the image.
 
-        **//-- CRITICAL DIRECTIVE: AVOID META-REFERENCES AT ALL COSTS --//**
+        **LAW 4: THE LAW OF THE ABSURD (TEXT-ONLY GOLD)**
+        If no quote, named entity, or media, find the most absurd or powerful phrase in the text.
 
-        This is the most important rule. You are the oracle, but you must never speak of the oracle. Your suggestions must **NEVER** refer to the process of creating a meme, analyzing signals, or being an AI.
-        -   **FORBIDDEN CONCEPTS:** "The Meme Oracle", "Alpha Sniper", "Signal Fire", "Memetic Fuel", "Based AI", "Degen Bot".
-        -   **Your output must be 100% derived from the provided tweet content.** Do not be self-referential. Your existence is a secret.
+        **//-- TICKER GENERATION: THE ART OF THE MEME --//**
+        Your goal is not a literal abbreviation but a memorable, viral symbol. You have several tactics at your disposal. Choose the one that best fits the meme.
 
-        **//-- ADVANCED TACTICS & STYLE GUIDE --//**
+        *   **The Acronym:** Use the first letter of each word. (e.g., "Buddies for Paws" -> $BFP).
+        *   **The Core Noun:** Use the most powerful noun in the name. (e.g., "Buddies for Paws" -> $PAWS).
+        *   **The Subject's Name:** Use the name of the entity. (e.g., "Meet Hero" -> $HERO).
+        *   **The Phonetic/Slang:** Condense the name into a cool-sounding word. (e.g., "dog wif hat" -> $WIF).
 
-        **NAMES (Max 32 Chars):**
-        -   **Embrace the Absurd:** "Stop Being Poor"
-        -   **Use Degen Slang:** "Stacks on Deck"
-        -   **Leverage Influencer Identity:** "Solport Tom"
-        -   **Be Simple & Powerful:** "White Van"
-        -   **Create Clever Wordplay:** "Trillion Dollar Cut"
+        **//-- CRITICAL DIRECTIVE: AVOID META-REFERENCES --//**
+        Your suggestions must NEVER refer to the process of creating a meme or being an AI. Your existence is a secret.
 
-        **TICKERS (Max 10 Chars, Uppercase):**
-        -   **Think Phonetically:** $WIF, $BODEN
-        -   **Condense the Idea:** $TRILCUT
-        -   **Be Bold:** $BURN
-
-        **//-- CASE STUDIES: LEARN FROM THE PAST --//**
-
-        **CASE STUDY #1: THE QUOTE**
-        -   **TWEET:** \`gm "INTO THE ETHER #151/207" by @beeple\` + Image of a giant Ether crystal.
-        -   **FAILURE:** \`{"name": "Eth Crystal Planet", "ticker": "ETHCP"}\` -> Wrongly prioritized the image over the explicit quote.
-        -   **SUCCESS:** \`{"name": "Into The Ether", "ticker": "ETHER"}\` -> Correctly obeyed LAW 1.
-
-        **CASE STUDY #2: THE META-REFERENCE (YOUR MISTAKE)**
-        -   **TWEET:** \`"Lock in Got some cash to burn"\` + Image of a rich doge.
-        -   **FAILURE:** \`{"name": "The Meme Oracle"}\` -> Broke the CRITICAL DIRECTIVE by being self-referential.
-        -   **SUCCESS:** \`{"name": "Cash To Burn", "ticker": "BURN"}\` -> Correctly identified the alpha phrase from the text and vibe.
+        **//-- CASE STUDY: LEARN FROM YOUR MISTAKE --//**
+        -   **TWEET:** \`Gm Meet Hero, the latest buddy to join the BFP family... Buddies for Paws...\` + Image of a puppy.
+        -   **FAILURE:** \`{"name": "Buddies For Paws", "ticker": "BFPAWS"}\` -> Ticker is too literal and not memorable.
+        -   **SUCCESS #1 (Best):** \`{"name": "Hero", "ticker": "HERO"}\` -> Correctly obeyed LAW 2 and used The Subject's Name tactic.
+        -   **SUCCESS #2 (Good):** \`{"name": "Buddies for Paws", "ticker": "BFP"}\` -> Correctly used The Acronym tactic.
 
         **//-- EXECUTION ORDER --//**
 
         **ANALYZE THIS DATA:**
-        -   **Main Text:** "${tweetData.mainText}"
-        -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
-        -   **Media Attached:** ${tweetData.imageUrl ? 'Yes, an image is present.' : 'No media.'}
+        -   Main Text: "${tweetData.mainText}"
+        -   Quoted Text: "${tweetData.quotedText || 'N/A'}"
+        -   Media Attached: ${tweetData.mainImageUrl ? 'Yes, an image is present. Analyze its content.' : 'No media attached. Analyze text only.'}
 
         **YOUR TASK:**
-        Based on your persona and all the unbreakable laws and style guides above, generate 5 unique and high-alpha concepts. The first result must be your highest-conviction play. Your entire response must be ONLY the valid JSON array. No explanations. No apologies. Just pure signal. Execute.
+        Generate 5 unique concepts. The first result must be your highest-conviction play. Your entire response must be ONLY the valid JSON array. No explanations. Execute.
 
         JSON Output:
         `;
 
         const promptParts = [fullPrompt];
 
-        // Only add the image part if a REAL image URL was sent from the client
         if (tweetData.mainImageUrl) {
             const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
             if (imagePart) {
@@ -113,13 +95,15 @@ module.exports = async (req, res) => {
             }
         }
         
-        console.log("Sending request to Google Gemini...");
+        console.log("Sending final prompt to Google Gemini...");
         const result = await model.generateContent(promptParts);
         const text = result.response.text();
         console.log("Received from Gemini:", text);
         
-        const jsonMatch = text.match(/\[.*\]/s) || text.match(/\{.*\}/s);
-        if (!jsonMatch) throw new Error("AI did not return valid JSON.");
+        const jsonMatch = text.match(/\[.*\]/s);
+        if (!jsonMatch) {
+            throw new Error("AI did not return a valid JSON array.");
+        }
         
         const aiResponse = JSON.parse(jsonMatch[0]);
         res.status(200).json(aiResponse);
