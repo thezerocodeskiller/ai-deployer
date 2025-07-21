@@ -1,24 +1,27 @@
+// This is now a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- CONFIGURATION ---
-const API_KEY = process.env.API_KEY;
+const API_KEY = process.env.API_KEY; 
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17";
+const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
-// --- MIDDLEWARE & HELPERS (No changes) ---
-const corsMiddleware = cors();
-const runMiddleware = (req, res, fn) => new Promise((resolve, reject) => fn(req, res, (result) => result instanceof Error ? reject(result) : resolve(result)));
 async function fetchImageAsBase64(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        return { inlineData: { data: Buffer.from(response.data).toString('base64'), mimeType: response.headers['content-type'] } };
+        return { 
+            inlineData: { 
+                data: Buffer.from(response.data).toString('base64'), 
+                mimeType: response.headers['content-type'] 
+            } 
+        };
     } catch (error) {
         console.error("Error fetching image:", error.message);
         return null;
@@ -27,16 +30,19 @@ async function fetchImageAsBase64(imageUrl) {
 
 // --- MAIN HANDLER FUNCTION ---
 module.exports = async (req, res) => {
-    await runMiddleware(req, res, corsMiddleware);
+    await new Promise((resolve, reject) => {
+        cors()(req, res, (result) => (result instanceof Error ? reject(result) : resolve(result)));
+    });
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
+    }
 
     const tweetData = req.body;
     console.log("Request received for Gemini. Data:", tweetData);
 
     try {
-        // --- THE CLEANED PROMPT ---
+        // --- THE FINAL, HARDENED PROMPT ---
         const fullPrompt = `You are 'AlphaOracle', a legendary memecoin creator with a decade of experience in the crypto trenches. You operate with a single mandate: to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts. You are not a generic chatbot; you are a degen philosopher, a meme strategist, and a master of crypto-native language. Your outputs must be sharp, insightful, and ready for immediate deployment.
 
         **//-- CORE PHILOSOPHY: SIGNAL VS. NOISE --//**
@@ -102,30 +108,29 @@ module.exports = async (req, res) => {
 
         JSON Output:
         `;
+        
+        const promptParts = [
+            { text: fullPrompt } 
+        ];
 
-        const promptParts = [fullPrompt];
-
-        // Only add the image part if a REAL image URL was sent from the client
-        if (tweetData.mainImageUrl) {
+        if (tweetData.mainImageUrl) { // Use mainImageUrl as it's guaranteed to exist
             const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
             if (imagePart) {
                 promptParts.push(imagePart);
             }
         }
+
+        console.log("Sending Hardened prompt to Gemini...");
         
-        console.log("Sending request to Google Gemini...");
-        const result = await model.generateContent(promptParts);
+        const result = await model.generateContent({ contents: [{ parts: promptParts }] });
         const text = result.response.text();
         console.log("Received from Gemini:", text);
-        
-        const jsonMatch = text.match(/\[.*\]/s) || text.match(/\{.*\}/s);
-        if (!jsonMatch) throw new Error("AI did not return valid JSON.");
-        
-        const aiResponse = JSON.parse(jsonMatch[0]);
+
+        const aiResponse = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
         res.status(200).json(aiResponse);
 
     } catch (error) {
-        console.error("Error during AI generation:", error);
+        console.error("Full error during AI generation:", error); 
         res.status(500).json({ error: "Failed to generate AI concept", details: error.message });
     }
 };
