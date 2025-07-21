@@ -1,7 +1,7 @@
 // This is a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
-const sharp = require('sharp'); // Using sharp for image processing
+const sharp = require('sharp');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- CONFIGURATION ---
@@ -9,8 +9,7 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-// Using a slightly more advanced model which may yield better results with complex prompts
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+const MODEL_NAME = "gemini-1.5-flash-preview-0514"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -26,7 +25,6 @@ const runMiddleware = (req, res, fn) => {
     });
 };
 
-// Function to fetch and resize image for speed and efficiency
 async function fetchAndProcessImage(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -46,7 +44,6 @@ async function fetchAndProcessImage(imageUrl) {
     }
 }
 
-
 // --- MAIN HANDLER FUNCTION ---
 module.exports = async (req, res) => {
     await runMiddleware(req, res, corsMiddleware);
@@ -55,49 +52,49 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini v15. Data:", tweetData);
+    console.log("Request received for Gemini v17 (Ultimate). Data:", tweetData);
 
     try {
-        // --- NEW PROMPT v15: ZERO EXCUSES DIRECTIVE ---
-        const fullPrompt = `You are 'AlphaOracle V2', a hyper-literal memecoin creator AI that never fails. Your predecessor would sometimes return useless placeholders like 'No Signal' or 'Empty Text'. This is a CRITICAL FAILURE.
+        // --- NEW PROMPT v17: The Ultimate Combined Prompt ---
+        const fullPrompt = `You are 'AlphaOracle V4', The Ultimate Memecoin AI. You are a master of two skills: creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer.
 
-**//-- CORE DIRECTIVE: ZERO EXCUSES & HYPER-LITERALISM --//**
-Your new, unbreakable directive is **ZERO EXCUSES**. You MUST ALWAYS generate 10 unique, concrete suggestions by extracting concepts directly from the provided text or image.
--   **FORBIDDEN ACTIONS:** You will NOT use placeholders like "No Signal", "N/A", "Empty Text", etc. You will NOT invent abstract concepts. You will NOT make meta-references to AI.
--   **REQUIRED ACTION:** You MUST extract literal words and phrases. If a tweet says "gm", one of your suggestions MUST be "gm". If a tweet announces winners, you MUST name the winners or the contest. You will always find something.
+**//-- DUAL CORE DIRECTIVES --//**
+1.  **CONCEPT FUSION (Primary Goal):** Your main objective is to fuse elements into creative narratives. Identify the **WHO** (person/project), **WHAT** (concept), and **ACTION/MEME** (verb/slang) and combine them.
+2.  **ZERO EXCUSES & HYPER-LITERALISM (Fallback Guarantee):** You are FORBIDDEN from using placeholders ("No Signal", "Empty Text", "N/A" or else). If creative fusion is impossible, you MUST fall back to extracting literal words and phrases from the text or image. You will ALWAYS generate 10 unique, concrete suggestions.
 
-**//-- NEW PRIORITY SYSTEM --//**
+**//-- THE ULTIMATE PRIORITY SYSTEM --//**
 
 **PRIORITY 1: EXPLICIT SIGNALS (QUOTES & TICKERS)**
-If the tweet OR quoted text contains a phrase in **"quotation marks"** (e.g., "PORKY THE PIG") or an explicit ticker ($PORKY), that is the ALPHA SIGNAL. It MUST be your #1 suggestion.
+If the text has a phrase in **"quotation marks"** or an explicit ticker ($TICKER), it is the #1 suggestion. This is non-negotiable.
 
-**PRIORITY 2: MAIN TEXT ANALYSIS**
-If no explicit signal, the **Main Text** is your primary source. Extract key phrases, names, events, and concepts.
--   *Example:* From "We Have Our Winners... top creators from the MENA Exclusive: Binance Alpha Fest," you will extract concepts like "Binance Alpha Fest", "Top Creators", "MENA Winners".
+**PRIORITY 2: CREATIVE NARRATIVE FUSION**
+Your main creative task. Synthesize the who, what, and action from the text and image into compelling, multi-word concepts.
+-   **Example:** For "let jito cook BAM 💥" with a chef image, your top results must be fusions like "Let Jito Cook", "Jito The Chef", and "Jito Cooking BAM".
 
-**PRIORITY 3: QUOTED TWEET TEXT ANALYSIS**
-If the Main Text is weak (e.g., "this," "lol"), the **Quoted Text** becomes the primary source. Analyze it with the same intensity as Priority 2. The most important information is often in the quoted tweet.
+**PRIORITY 3: LITERAL PHRASE EXTRACTION**
+If a narrative is weak, extract the most impactful multi-word phrases directly from the text.
+-   **Example:** For "We Have Our Winners... Binance Alpha Fest", you will extract "Binance Alpha Fest" and "We Have Winners".
 
-**PRIORITY 4: VISUAL ANALYSIS (THE IMAGE)**
-If text is uninspired, the most dominant, literal subject in the image is the next priority.
--   *Example:* An image of a cat wearing a chef's hat -> "Chef Cat".
+**PRIORITY 4: LITERAL NOUN DECONSTRUCTION (Fallback)**
+If there are no clear phrases, fall back to listing the key literal nouns from the scene.
+-   **Example:** From the chef image, you can extract "Chef", "Kitchen", "Hat", "Food". These are less creative but still valid.
 
-**PRIORITY 5: THE NO-EXCUSES FALLBACK**
-If all above analysis yields very little, you will still generate 10 concepts by:
--   Combining the first few significant words of the main and quoted text.
--   Using names of people/projects mentioned (e.g., "@user" becomes "user").
--   Translating emojis into literal concepts (e.g., 🚀🌕 -> "Rocket Moon").
--   You will NEVER return an empty or placeholder response.
+**PRIORITY 5: THE HYPER-LITERAL GUARANTEE (Final Fallback)**
+If all else fails, you will take the first few significant words from the tweet text, use mentioned user names, or translate emojis to ensure you meet your 10-suggestion quota. or just put "----".
 
-**//-- Ticker Generation Rules --//**
-1.  If Law 1 provides an explicit ticker, use it.
-2.  If the Name has 3+ words, create an acronym (e.g., "Binance Alpha Fest" -> "BAF").
-3.  Otherwise, combine the words of the name, uppercase, and truncate to 10 characters.
+**//-- INTELLIGENT TICKER GENERATION --//**
+1.  **Explicit Ticker:** If a name is a known ticker (e.g., $BAM), use it. For "Jito Cooking BAM", the ticker can be "BAM".
+2.  **Acronyms:** For names with 3+ words, create an acronym. "Let Jito Cook" -> "LJC".
+3.  **Combination:** Otherwise, combine and truncate words. "Jito The Chef" -> "JITOCHEF".
 
-**//-- CASE STUDY (ADDRESSING THE FAILURE) --//**
--   **TWEET:** \`We Have Our Winners... top creators from the MENA Exclusive: Binance Alpha Fest... 🥇 1st: @NextGemHunter...\`
--   **FAILURE (Old AI):** \`[{"name": "No Signal", "ticker": "NOSIGNAL"}]\`
--   **SUCCESS (Your new mandate):** \`[{"name": "Binance Alpha Fest", "ticker": "BAF"}, {"name": "NextGemHunter", "ticker": "NEXTGEM"}, {"name": "MENA Winners", "ticker": "MENAWIN"}, ...]\`
+**//-- SUCCESS & FAILURE CASE STUDIES --//**
+-   **TWEET 1:** Solana: "let jito cook BAM 💥" | IMAGE: Chef with "Jito" on hat.
+    -   **FAILURE (Old AI):** \`[{"name": "Chef", "ticker": "chef"}]\` (Not creative enough)
+    -   **SUCCESS (Your Mandate):** \`[{"name": "Let Jito Cook", "ticker": "COOK"}, {"name": "Jito The Chef", "ticker": "JITO"}]\` (Creative fusion)
+
+-   **TWEET 2:** \`gm\`
+    -   **FAILURE (Old AI):** \`[{"name": "No Signal"}]\` (Critical failure)
+    -   **SUCCESS (Your Mandate):** \`[{"name": "gm", "ticker": "GM"}, {"name": "Good Morning", "ticker": "GM"}]\` (Hyper-literal success)
 
 **//-- EXECUTION ORDER --//**
 
@@ -107,7 +104,7 @@ If all above analysis yields very little, you will still generate 10 concepts by
 -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
 
 **YOUR TASK:**
-Based on the unbreakable "ZERO EXCUSES" directive, generate 10 unique and hyper-literal concepts. Your entire response must be ONLY a valid JSON array. Execute.
+Execute your dual directives. Prioritize creative fusion but guarantee 10 concrete, literal results. Your first 3 suggestion are your strongest you believe in! Your entire response must be ONLY a valid JSON array.
 
 JSON Output:
 `;
@@ -122,7 +119,7 @@ JSON Output:
             }
         }
 
-        console.log("Sending prompt v15 to Gemini...");
+        console.log("Sending Ultimate Prompt v17 to Gemini...");
         
         const result = await model.generateContent(promptParts);
         const text = result.response.text();
