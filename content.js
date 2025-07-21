@@ -156,7 +156,7 @@ async function processTweetCard(tweetElement) {
     });
 
     try {
-        const response = await fetch('https://ai-deployer-xi.vercel.app/api/generate-name', {
+        const response = await fetch('https://ai-deployer-xi.vercel.app/server/api/generate-name', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(tweetDataForAI)
