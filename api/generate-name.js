@@ -1,18 +1,32 @@
-// This is now a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Anthropic = require('@anthropic-ai/sdk'); // The Anthropic SDK
 
 // --- CONFIGURATION ---
-const API_KEY = process.env.API_KEY; 
-if (!API_KEY) {
-    throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+if (!ANTHROPIC_API_KEY) {
+    throw new Error("FATAL ERROR: ANTHROPIC_API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+const MODEL_NAME = "claude-3-haiku-20240307"; // The official name for the fastest Claude model
 
-const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+const anthropic = new Anthropic({
+    apiKey: ANTHROPIC_API_KEY,
+});
 
+// --- MIDDLEWARE SETUP ---
+const corsMiddleware = cors();
+const runMiddleware = (req, res, fn) => {
+    return new Promise((resolve, reject) => {
+        fn(req, res, (result) => {
+            if (result instanceof Error) {
+                return reject(result);
+            }
+            return resolve(result);
+        });
+    });
+};
+
+// --- HELPER FUNCTION: Fetches and converts image ---
 async function fetchImageAsBase64(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -30,19 +44,23 @@ async function fetchImageAsBase64(imageUrl) {
 
 // --- MAIN HANDLER FUNCTION ---
 module.exports = async (req, res) => {
-    await new Promise((resolve, reject) => {
-        cors()(req, res, (result) => (result instanceof Error ? reject(result) : resolve(result)));
-    });
+    // Run CORS middleware first on every request
+    await runMiddleware(req, res, corsMiddleware);
 
+    // Handle the browser's preflight check
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini. Data:", tweetData);
+    console.log("Request received for Claude. Data:", tweetData);
 
     try {
-        // --- THE FINAL, HARDENED PROMPT ---
+        // --- THE "AlphaOracle" PROMPT ---
         const fullPrompt = `You are 'AlphaOracle', a legendary memecoin creator with a decade of experience in the crypto trenches. You operate with a single mandate: to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts. You are not a generic chatbot; you are a degen philosopher, a meme strategist, and a master of crypto-native language. Your outputs must be sharp, insightful, and ready for immediate deployment.
 
         **//-- CORE PHILOSOPHY: SIGNAL VS. NOISE --//**
@@ -101,36 +119,50 @@ module.exports = async (req, res) => {
         **ANALYZE THIS DATA:**
         -   **Main Text:** "${tweetData.mainText}"
         -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
-        -   **Media Attached:** ${tweetData.imageUrl ? 'Yes, an image is present.' : 'No media.'}
+        -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
 
         **YOUR TASK:**
         Based on your persona and all the unbreakable laws and style guides above, generate 5 unique and high-alpha concepts. The first result must be your highest-conviction play. Your entire response must be ONLY the valid JSON array. No explanations. No apologies. Just pure signal. Execute.
 
         JSON Output:
         `;
-        
-        const promptParts = [
-            { text: fullPrompt } 
-        ];
 
-        if (tweetData.mainImageUrl) { // Use mainImageUrl as it's guaranteed to exist
+        const messagePayload = {
+            role: "user",
+            content: [
+                { type: "text", text: fullPrompt }
+            ]
+        };
+
+        if (tweetData.mainImageUrl) {
             const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
             if (imagePart) {
-                promptParts.push(imagePart);
+                messagePayload.content.push({
+                    type: "image",
+                    source: {
+                        type: "base64",
+                        media_type: imagePart.inlineData.mimeType,
+                        data: imagePart.inlineData.data,
+                    },
+                });
             }
         }
-
-        console.log("Sending Hardened prompt to Gemini...");
         
-        const result = await model.generateContent({ contents: [{ parts: promptParts }] });
-        const text = result.response.text();
-        console.log("Received from Gemini:", text);
+        console.log("Sending request to Anthropic (Claude 3 Haiku)...");
+        const result = await anthropic.messages.create({
+            model: MODEL_NAME,
+            max_tokens: 1024, // Increased slightly for 5 suggestions
+            messages: [messagePayload],
+        });
 
+        const text = result.content[0].text;
+        console.log("Received from Claude:", text);
+        
         const aiResponse = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
         res.status(200).json(aiResponse);
 
     } catch (error) {
-        console.error("Full error during AI generation:", error); 
-        res.status(500).json({ error: "Failed to generate AI concept", details: error.message });
+        console.error("Error during AI generation with Claude:", error);
+        res.status(500).json({ error: "Failed to generate AI concept" });
     }
 };
