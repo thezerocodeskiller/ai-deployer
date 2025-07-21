@@ -1,4 +1,4 @@
-// This is a dedicated serverless function for Vercel.
+// This is now a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -13,16 +13,6 @@ const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17";
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
-// --- MIDDLEWARE SETUP & HELPERS ---
-const corsMiddleware = cors();
-const runMiddleware = (req, res, fn) => {
-    return new Promise((resolve, reject) => {
-        fn(req, res, (result) => {
-            if (result instanceof Error) { return reject(result); }
-            return resolve(result);
-        });
-    });
-};
 async function fetchImageAsBase64(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -40,10 +30,13 @@ async function fetchImageAsBase64(imageUrl) {
 
 // --- MAIN HANDLER FUNCTION ---
 module.exports = async (req, res) => {
-    await runMiddleware(req, res, corsMiddleware);
+    await new Promise((resolve, reject) => {
+        cors()(req, res, (result) => (result instanceof Error ? reject(result) : resolve(result)));
+    });
 
-    if (req.method === 'OPTIONS') { return res.status(200).end(); }
-    if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
+    }
 
     const tweetData = req.body;
     console.log("Request received for Gemini. Data:", tweetData);
@@ -108,7 +101,7 @@ module.exports = async (req, res) => {
         **ANALYZE THIS DATA:**
         -   **Main Text:** "${tweetData.mainText}"
         -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
-        -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
+        -   **Media Attached:** ${tweetData.imageUrl ? 'Yes, an image is present.' : 'No media.'}
 
         **YOUR TASK:**
         Based on your persona and all the unbreakable laws and style guides above, generate 5 unique and high-alpha concepts. The first result must be your highest-conviction play. Your entire response must be ONLY the valid JSON array. No explanations. No apologies. Just pure signal. Execute.
@@ -117,10 +110,10 @@ module.exports = async (req, res) => {
         `;
         
         const promptParts = [
-            fullPrompt 
+            { text: fullPrompt } 
         ];
 
-        if (tweetData.mainImageUrl) {
+        if (tweetData.mainImageUrl) { // Use mainImageUrl as it's guaranteed to exist
             const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
             if (imagePart) {
                 promptParts.push(imagePart);
@@ -129,16 +122,11 @@ module.exports = async (req, res) => {
 
         console.log("Sending Hardened prompt to Gemini...");
         
-        const result = await model.generateContent(promptParts);
+        const result = await model.generateContent({ contents: [{ parts: promptParts }] });
         const text = result.response.text();
         console.log("Received from Gemini:", text);
-        
-        const jsonMatch = text.match(/\[.*\]/s); // Find the array in the response
-        if (!jsonMatch) {
-            throw new Error("AI did not return a valid JSON array.");
-        }
 
-        const aiResponse = JSON.parse(jsonMatch[0]);
+        const aiResponse = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
         res.status(200).json(aiResponse);
 
     } catch (error) {
