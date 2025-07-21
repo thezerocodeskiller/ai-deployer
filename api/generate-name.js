@@ -1,6 +1,7 @@
 // This is a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
+const sharp = require('sharp'); // <-- Import the new library
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- CONFIGURATION ---
@@ -8,7 +9,7 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+const MODEL_NAME = "gemini-1.5-flash-preview-0514"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -23,17 +24,27 @@ const runMiddleware = (req, res, fn) => {
         });
     });
 };
-async function fetchImageAsBase64(imageUrl) {
+
+// --- NEW & IMPROVED IMAGE FETCHING FUNCTION ---
+async function fetchAndProcessImage(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+        const mimeType = response.headers['content-type'];
+        
+        // Use sharp to resize the image to a max of 512x512 and convert to JPEG for efficiency
+        const processedImageBuffer = await sharp(response.data)
+            .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 80 })
+            .toBuffer();
+
         return { 
             inlineData: { 
-                data: Buffer.from(response.data).toString('base64'), 
-                mimeType: response.headers['content-type'] 
+                data: processedImageBuffer.toString('base64'), 
+                mimeType: 'image/jpeg' // We now always send JPEG
             } 
         };
     } catch (error) {
-        console.error("Error fetching image:", error.message);
+        console.error("Error fetching or processing image:", error.message);
         return null;
     }
 }
@@ -46,10 +57,10 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini v14. Data:", tweetData);
+    console.log("Request received for Gemini. Data:", tweetData);
 
     try {
-        // --- THE FINAL PROMPT v14: THE LAST RESORT DIRECTIVE ---
+        // Your prompt remains the same, requesting 3 suggestions.
 const fullPrompt = `You are 'AlphaOracle', a memecoin creator AI. Your task is to analyze social media posts and extract viral concepts.
 
 **//-- CORE DIRECTIVE: HYPER-LITERAL & NO DEFAULTS --//**
@@ -109,14 +120,20 @@ Based on all unbreakable laws above, generate 3 unique and hyper-literal concept
 
 JSON Output:
 `;        
+        
         const promptParts = [ fullPrompt ];
 
+        // This part now uses the new, faster function
         if (tweetData.mainImageUrl) {
-            const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
-            if (imagePart) promptParts.push(imagePart);
+            console.log("Image detected. Fetching and processing...");
+            const imagePart = await fetchAndProcessImage(tweetData.mainImageUrl); // <-- Using the new function
+            if (imagePart) {
+                promptParts.push(imagePart);
+                console.log("Image processing complete. Sending to AI.");
+            }
         }
 
-        console.log("Sending Final Hardened prompt v14 to Gemini...");
+        console.log("Sending prompt to Gemini...");
         
         const result = await model.generateContent(promptParts);
         const text = result.response.text();
