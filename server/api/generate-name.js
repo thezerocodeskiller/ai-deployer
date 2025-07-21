@@ -156,10 +156,3 @@ Now, await the user's data and execute your directives. Your entire response mus
         res.status(500).json({ error: "Failed to generate AI concept", details: error.message });
     }
 };
-
-
-
-
-
-
-
