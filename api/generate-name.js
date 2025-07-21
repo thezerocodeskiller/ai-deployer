@@ -8,7 +8,7 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+const MODEL_NAME = "gemini-1.5-flash-latest"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -46,9 +46,10 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini. Data:", tweetData);
+    console.log("Request received for Gemini v13. Data:", tweetData);
 
     try {
+        // --- THE "AlphaOracle" PROMPT with Grounding Directive ---
         const fullPrompt = `You are 'AlphaOracle', a memecoin creator AI. Your task is to analyze social media posts and extract viral concepts.
 
         **//-- CRITICAL DIRECTIVE: GROUNDING --//**
@@ -57,13 +58,13 @@ module.exports = async (req, res) => {
         **//-- THE UNBREAKABLE LAWS OF MEME SELECTION --//**
 
         **LAW 1: THE LAW OF THE EXPLICIT TICKER (ABSOLUTE PRIORITY)**
-        If the tweet text or quoted text explicitly mentions a ticker symbol (e.g., "$BONK"), that ticker is the **ALPHA SIGNAL** and must be your #1 suggestion.
+        If the tweet text OR the quoted text explicitly mentions a ticker symbol (e.g., "$BONK"), that ticker is the **ALPHA SIGNAL** and must be your #1 suggestion.
 
         **LAW 2: THE LAW OF THE IMAGE (VISUAL DOMINANCE)**
         If there is no explicit ticker, the visual content is the next priority. Identify the most dominant, literal subject. (e.g., An image of a man in a courtroom -> "Courtroom Sketch").
 
         **LAW 3: THE LAW OF TEXTUAL CONTEXT (MERGED ANALYSIS)**
-        If no ticker or media, scan the **Main Text and Quoted Text combined** for the most impactful, literal phrase. (e.g., "Bryan Kohberger prowled room by room" -> "Bryan Kohberger").
+        If no ticker or media, scan the **Main Text and Quoted Text as a single source of truth** for the most impactful, literal phrase. (e.g., Main: "Good idea." Quoted: "We need to keep the suitcoins companies accountable." -> The clear signal is "Suitcoins").
 
         **//-- FORBIDDEN ACTIONS --//**
         -   **DO NOT** generate abstract concepts (e.g., "The Void," "No Signal").
@@ -91,7 +92,7 @@ module.exports = async (req, res) => {
         -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
 
         **YOUR TASK:**
-        Based on all unbreakable laws above, generate 5 unique and hyper-literal concepts. Your entire response must be ONLY a valid JSON array. Execute.
+        Based on all unbreakable laws above, generate 5 unique and hyper-literal concepts. The first result must be your highest-conviction play. Your entire response must be ONLY a valid JSON array. Execute.
 
         JSON Output:
         `;
@@ -100,12 +101,10 @@ module.exports = async (req, res) => {
 
         if (tweetData.mainImageUrl) {
             const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
-            if (imagePart) {
-                promptParts.push(imagePart);
-            }
+            if (imagePart) promptParts.push(imagePart);
         }
 
-        console.log("Sending Hyper-Literal prompt to Gemini...");
+        console.log("Sending Grounded prompt v13 to Gemini...");
         
         const result = await model.generateContent(promptParts);
         const text = result.response.text();
