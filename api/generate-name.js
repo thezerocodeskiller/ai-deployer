@@ -9,10 +9,14 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+const MODEL_NAME = "gemini-1.5-flash-preview-0514"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+const model = genAI.getGenerativeModel({ 
+    model: MODEL_NAME,
+    safetySettings: [
+    ]
+});
 
 // --- MIDDLEWARE SETUP & HELPERS ---
 const corsMiddleware = cors();
@@ -52,11 +56,12 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini v17 (Ultimate). Data:", tweetData);
+    console.log("Request received for Gemini (User V4 Prompt). Data:", tweetData);
 
     try {
-        // --- NEW PROMPT v17: The Ultimate Combined Prompt ---
-        const fullPrompt = `You are 'AlphaOracle V4', The Ultimate Memecoin AI. You are a master of two skills: creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer.
+        // --- YOUR CUSTOM PROMPT ---
+        // This is your exact prompt, now used as the system instructions.
+        const systemInstructions = `You are 'AlphaOracle V4', The Ultimate Memecoin AI. You are a master of two skills: creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer.
 
 **//-- DUAL CORE DIRECTIVES --//**
 1.  **CONCEPT FUSION (Primary Goal):** Your main objective is to fuse elements into creative narratives. Identify the **WHO** (person/project), **WHAT** (concept), and **ACTION/MEME** (verb/slang) and combine them.
@@ -96,37 +101,50 @@ If all else fails, you will take the first few significant words from the tweet 
     -   **FAILURE (Old AI):** \`[{"name": "No Signal"}]\` (Critical failure)
     -   **SUCCESS (Your Mandate):** \`[{"name": "gm", "ticker": "GM"}, {"name": "Good Morning", "ticker": "GM"}]\` (Hyper-literal success)
 
-**//-- EXECUTION ORDER --//**
+Now, await the user's data and execute your directives. Your entire response must be ONLY a valid JSON array.`;
+        
+        // --- This is the data to be analyzed ---
+        const userContentParts = [];
+        
+        // We create a clean textual payload for the AI to analyze.
+        const textPayload = `
+        **ANALYZE THIS DATA:**
+        -   **Main Text:** "${tweetData.mainText || 'N/A'}"
+        -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
+        -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
+        
+        **YOUR TASK:**
+        Execute your dual directives. Prioritize creative fusion but guarantee 10 concrete, literal results. Your first 3 suggestions are your strongest you believe in!
+        
+        JSON Output:
+        `;
+        
+        userContentParts.push({ text: textPayload });
 
-**ANALYZE THIS DATA:**
--   **Main Text:** "${tweetData.mainText}"
--   **Quoted Text:** "${tweetData.quotedText || ''}"
--   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
-
-**YOUR TASK:**
-Execute your dual directives. Prioritize creative fusion but guarantee 10 concrete, literal results. Your first 3 suggestion are your strongest you believe in! Your entire response must be ONLY a valid JSON array.
-
-JSON Output:
-`;
-        const promptParts = [ fullPrompt ];
-
+        // Add the image if it exists
         if (tweetData.mainImageUrl) {
-            console.log("Image detected. Fetching and processing...");
             const imagePart = await fetchAndProcessImage(tweetData.mainImageUrl);
             if (imagePart) {
-                promptParts.push(imagePart);
-                console.log("Image processing complete. Sending to AI.");
+                userContentParts.push(imagePart);
             }
         }
-
-        console.log("Sending Ultimate Prompt v17 to Gemini...");
         
-        const result = await model.generateContent(promptParts);
+        // Establish the conversation with the AI, giving it its instructions first.
+        const chat = model.startChat({
+            history: [
+                { role: "user", parts: [{ text: "You are an AI assistant. Here are your instructions." }] },
+                { role: "model", parts: [{ text: systemInstructions }] }
+            ]
+        });
+
+        console.log("Sending user content to Gemini for analysis using your V4 prompt...");
+        const result = await chat.sendMessage(userContentParts);
         const text = result.response.text();
         console.log("Received from Gemini:", text);
 
+        // Extract the JSON from the response
         const jsonMatch = text.match(/\[.*\]/s);
-        if (!jsonMatch) { throw new Error("AI did not return a valid JSON array."); }
+        if (!jsonMatch) { throw new Error("AI did not return a valid JSON array. Response was: " + text); }
 
         const aiResponse = JSON.parse(jsonMatch[0]);
         res.status(200).json(aiResponse);
