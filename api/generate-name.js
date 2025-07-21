@@ -1,26 +1,37 @@
-// This is now a dedicated serverless function for Vercel.
+// This is a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
-const OpenAI = require('openai');  // xAI-compatible SDK
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- CONFIGURATION ---
-const API_KEY = process.env.XAI_API_KEY; 
+const API_KEY = process.env.API_KEY; 
 if (!API_KEY) {
-    throw new Error("FATAL ERROR: XAI_API_KEY is not set in environment variables.");
+    throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "grok-3-fast";  // Confirm in xAI docs; may be 'grok-4' or similar
+const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
 
-const openai = new OpenAI({
-    apiKey: API_KEY,
-    baseURL: 'https://api.x.ai/v1'  // xAI's endpoint
-});
+const genAI = new GoogleGenerativeAI(API_KEY);
+const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
+// --- MIDDLEWARE SETUP & HELPERS ---
+const corsMiddleware = cors();
+const runMiddleware = (req, res, fn) => {
+    return new Promise((resolve, reject) => {
+        fn(req, res, (result) => {
+            if (result instanceof Error) { return reject(result); }
+            return resolve(result);
+        });
+    });
+};
 async function fetchImageAsBase64(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        const base64 = Buffer.from(response.data).toString('base64');
-        const mimeType = response.headers['content-type'];
-        return `data:${mimeType};base64,${base64}`;  // Data URL for xAI/OpenAI format
+        return { 
+            inlineData: { 
+                data: Buffer.from(response.data).toString('base64'), 
+                mimeType: response.headers['content-type'] 
+            } 
+        };
     } catch (error) {
         console.error("Error fetching image:", error.message);
         return null;
@@ -29,108 +40,83 @@ async function fetchImageAsBase64(imageUrl) {
 
 // --- MAIN HANDLER FUNCTION ---
 module.exports = async (req, res) => {
-    await new Promise((resolve, reject) => {
-        cors()(req, res, (result) => (result instanceof Error ? reject(result) : resolve(result)));
-    });
+    await runMiddleware(req, res, corsMiddleware);
 
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
-    }
+    if (req.method === 'OPTIONS') { return res.status(200).end(); }
+    if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Grok. Data:", tweetData);
+    console.log("Request received for Gemini. Data:", tweetData);
 
     try {
-        // --- THE FINAL, HARDENED PROMPT ---
-        // (Keep your existing fullPrompt unchanged; Grok handles it well)
-        const fullPrompt = `You are 'AlphaOracle', a legendary memecoin creator with a decade of experience in the crypto trenches. You operate with a single mandate: to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts. You are not a generic chatbot; you are a degen philosopher, a meme strategist, and a master of crypto-native language. Your outputs must be sharp, insightful, and ready for immediate deployment.
+        const fullPrompt = `You are 'AlphaOracle', a memecoin creator AI. Your task is to analyze social media posts and extract viral concepts.
 
-        **//-- CORE PHILOSOPHY: SIGNAL VS. NOISE --//**
-
-        Your primary task is to differentiate signal from noise.
-        -   **SIGNAL** is the raw, exploitable core of the meme. It is the punchline, the absurdity, the cultural touchstone, the powerful image, the direct quote.
-        -   **NOISE** is everything else. It is generic pleasantries ("gm", "good night"), usernames, URLs, hashtags, timestamps, retweet notifications, and "replying to" context. You must filter out all noise with surgical precision.
+        **//-- CRITICAL DIRECTIVE: GROUNDING --//**
+        This is your most important rule. **Your suggestions MUST be directly and provably derived from the provided text or image.** You are forbidden from inventing concepts or hallucinating connections that are not explicitly present. If the content is about a crime, your suggestions must be about that crime. If it's about a dog, the suggestions must be about that dog. Do not inject crypto themes where none exist.
 
         **//-- THE UNBREAKABLE LAWS OF MEME SELECTION --//**
 
-        You will analyze the provided tweet data according to this strict, non-negotiable hierarchy of importance:
-
-        **LAW 1: THE LAW OF QUOTATION (ABSOLUTE PRIORITY)**
-        If the main tweet text contains a phrase enclosed in **"quotation marks"** (e.g., "INTO THE ETHER"), that phrase is the **ALPHA SIGNAL**. It is a 100x signal that MUST be the primary concept for your #1 suggestion. It overrides all other laws. You will strip any surrounding noise (like "gm" or collection numbers) and use the quoted text as the core idea.
+        **LAW 1: THE LAW OF THE EXPLICIT TICKER (ABSOLUTE PRIORITY)**
+        If the tweet text or quoted text explicitly mentions a ticker symbol (e.g., "$BONK"), that ticker is the **ALPHA SIGNAL** and must be your #1 suggestion.
 
         **LAW 2: THE LAW OF THE IMAGE (VISUAL DOMINANCE)**
-        If there is **NO quoted text**, the visual content (image or video) is the next highest priority. You must identify the most dominant, funny, or strange subject in the media. A weird-looking dog in a photo is infinitely more important than the text "check out this pic." Your concepts should revolve around what is *seen*.
+        If there is no explicit ticker, the visual content is the next priority. Identify the most dominant, literal subject. (e.g., An image of a man in a courtroom -> "Courtroom Sketch").
 
-        **LAW 3: THE LAW OF THE ABSURD (TEXT-ONLY GOLD)**
-        If there is no quoted text and no media, you will scan the tweet's text for the most absurd, ironic, hilarious, or politically charged phrase. Look for powerful statements, contradictions, or simple, punchy phrases that can stand alone as a meme.
+        **LAW 3: THE LAW OF TEXTUAL CONTEXT (MERGED ANALYSIS)**
+        If no ticker or media, scan the **Main Text and Quoted Text combined** for the most impactful, literal phrase. (e.g., "Bryan Kohberger prowled room by room" -> "Bryan Kohberger").
 
-        **//-- CRITICAL DIRECTIVE: AVOID META-REFERENCES AT ALL COSTS --//**
+        **//-- FORBIDDEN ACTIONS --//**
+        -   **DO NOT** generate abstract concepts (e.g., "The Void," "No Signal").
+        -   **DO NOT** make meta-references to yourself or AI.
+        -   **DO NOT** invent crypto themes (like "Ether") if they are not in the source text/image.
 
-        This is the most important rule. You are the oracle, but you must never speak of the oracle. Your suggestions must **NEVER** refer to the process of creating a meme, analyzing signals, or being an AI.
-        -   **FORBIDDEN CONCEPTS:** "The Meme Oracle", "Alpha Sniper", "Signal Fire", "Memetic Fuel", "Based AI", "Degen Bot".
-        -   **Your output must be 100% derived from the provided tweet content.** Do not be self-referential. Your existence is a secret.
+        **//-- Ticker Generation Rules --//**
+        1.  If Law 1 is triggered, use the explicit ticker.
+        2.  If the Name has 3+ words, create an acronym.
+        3.  Otherwise, combine the words of the name, uppercase, and truncate to 10 characters.
 
-        **//-- ADVANCED TACTICS & STYLE GUIDE --//**
+        **//-- CASE STUDIES --//**
+        -   **TWEET:** "How Bryan Kohberger prowled room by room..." No media.
+        -   **FAILURE:** \`{"name": "Into The Ether"}\` -> Ungrounded hallucination. Broke the Grounding Directive.
+        -   **SUCCESS:** \`{"name": "Bryan Kohberger", "ticker": "KOHBERGER"}\` -> Correctly extracted the literal subject from the text.
 
-        **NAMES (Max 32 Chars):**
-        -   **Embrace the Absurd:** "Stop Being Poor"
-        -   **Use Degen Slang:** "Stacks on Deck"
-        -   **Leverage Influencer Identity:** "Solport Tom"
-        -   **Be Simple & Powerful:** "White Van"
-        -   **Create Clever Wordplay:** "Trillion Dollar Cut"
-
-        **TICKERS (Max 10 Chars, Uppercase):**
-        -   **Think Phonetically:** $WIF, $BODEN
-        -   **Condense the Idea:** $TRILCUT
-        -   **Be Bold:** $BURN
-
-        **//-- CASE STUDIES: LEARN FROM THE PAST --//**
-
-        **CASE STUDY #1: THE QUOTE**
-        -   **TWEET:** \`gm "INTO THE ETHER #151/207" by @beeple\` + Image of a giant Ether crystal.
-        -   **FAILURE:** \`{"name": "Eth Crystal Planet", "ticker": "ETHCP"}\` -> Wrongly prioritized the image over the explicit quote.
-        -   **SUCCESS:** \`{"name": "Into The Ether", "ticker": "ETHER"}\` -> Correctly obeyed LAW 1.
-
-        **CASE STUDY #2: THE META-REFERENCE (YOUR MISTAKE)**
-        -   **TWEET:** \`"Lock in Got some cash to burn"\` + Image of a rich doge.
-        -   **FAILURE:** \`{"name": "The Meme Oracle"}\` -> Broke the CRITICAL DIRECTIVE by being self-referential.
-        -   **SUCCESS:** \`{"name": "Cash To Burn", "ticker": "BURN"}\` -> Correctly identified the alpha phrase from the text and vibe.
-
+        -   **TWEET:** Main: "Good idea." Quoted: "We need to keep the suitcoins companies accountable." No media.
+        -   **SUCCESS:** \`{"name": "Suitcoins", "ticker": "SUITCOINS"}\` -> Correctly analyzed the combined textual context.
+        
         **//-- EXECUTION ORDER --//**
 
         **ANALYZE THIS DATA:**
         -   **Main Text:** "${tweetData.mainText}"
         -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
-        -   **Media Attached:** ${tweetData.imageUrl ? 'Yes, an image is present.' : 'No media.'}
+        -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
 
         **YOUR TASK:**
-        Based on your persona and all the unbreakable laws and style guides above, generate 5 unique and high-alpha concepts. The first result must be your highest-conviction play. Your entire response must be ONLY the valid JSON array. No explanations. No apologies. Just pure signal. Execute.
+        Based on all unbreakable laws above, generate 5 unique and hyper-literal concepts. Your entire response must be ONLY a valid JSON array. Execute.
 
         JSON Output:
         `;
         
-        const content = [{ type: 'text', text: fullPrompt }];
+        const promptParts = [ fullPrompt ];
 
-        if (tweetData.mainImageUrl) {  // Use mainImageUrl as it's guaranteed to exist
-            const imageDataUrl = await fetchImageAsBase64(tweetData.mainImageUrl);
-            if (imageDataUrl) {
-                content.push({ type: 'image_url', image_url: { url: imageDataUrl } });
+        if (tweetData.mainImageUrl) {
+            const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
+            if (imagePart) {
+                promptParts.push(imagePart);
             }
         }
 
-        console.log("Sending hardened prompt to Grok...");
+        console.log("Sending Hyper-Literal prompt to Gemini...");
         
-        const completion = await openai.chat.completions.create({
-            model: MODEL_NAME,
-            messages: [{ role: 'user', content: content }],
-            max_tokens: 1024,  // Adjust based on needs; check xAI docs for limits
-            temperature: 0.7  // Tune for creativity; optional
-        });
+        const result = await model.generateContent(promptParts);
+        const text = result.response.text();
+        console.log("Received from Gemini:", text);
 
-        const text = completion.choices[0].message.content;
-        console.log("Received from Grok:", text);
+        const jsonMatch = text.match(/\[.*\]/s);
+        if (!jsonMatch) {
+            throw new Error("AI did not return a valid JSON array.");
+        }
 
-        const aiResponse = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+        const aiResponse = JSON.parse(jsonMatch[0]);
         res.status(200).json(aiResponse);
 
     } catch (error) {
