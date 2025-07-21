@@ -9,11 +9,13 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
+// UNCHANGED: Using your specified model
 const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: MODEL_NAME,
+    // UNCHANGED: safetySettings are empty as you had it
     safetySettings: [
     ]
 });
@@ -56,15 +58,20 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini (V5 Named Entity). Data:", tweetData);
+    console.log("Request received for Gemini (V5 + Char Limits). Data:", tweetData);
 
     try {
-        // --- PROMPT V5: With Named Entity Recognition ---
-        const systemInstructions = `You are 'AlphaOracle V5', The Ultimate Memecoin AI. You are a master of creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer.
+        // --- PROMPT V5: With Character Limits Added ---
+        const systemInstructions = `You are 'AlphaOracle V5', The Ultimate Memecoin AI. You are a master of creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer that fits the required format.
 
 **//-- DUAL CORE DIRECTIVES --//**
 1.  **CONCEPT FUSION (Primary Goal):** Your main objective is to fuse elements into creative narratives. Identify the **WHO** (person/project), **WHAT** (concept), and **ACTION/MEME** (verb/slang) and combine them.
 2.  **ZERO EXCUSES & HYPER-LITERALISM (Fallback Guarantee):** You are FORBIDDEN from using placeholders ("No Signal", "Empty Text", "N/A" or else). If creative fusion is impossible, you MUST fall back to extracting literal words and phrases. You will ALWAYS generate 10 unique, concrete suggestions.
+
+**//-- OUTPUT FORMAT RULES (CRITICAL) --//**
+-   **Name:** MUST be 32 characters or less.
+-   **Ticker:** MUST be 10 characters or less.
+-   You must strictly adhere to these length limits.
 
 **//-- THE ULTIMATE PRIORITY SYSTEM --//**
 
@@ -87,10 +94,10 @@ If there are no clear phrases, fall back to listing the key literal nouns from t
 If all else fails, take the first few words from the tweet text to meet your 10-suggestion quota.
 
 **//-- INTELLIGENT TICKER GENERATION --//**
-1.  **Named Entity Rule:** If a Named Entity is identified (Priority 2), its name MUST be the top choice for the ticker. For the concept 'Super EU Dog' where the dog is named 'Shadow', the ticker MUST be 'SHADOW'. This overrides other rules.
+1.  **Named Entity Rule:** If a Named Entity is identified (Priority 2), its name MUST be the top choice for the ticker. For the concept 'Super EU Dog' where the dog is named 'Shadow', the ticker MUST be 'SHADOW'. This ticker must be **10 characters or less.**
 2.  **Explicit Ticker Rule:** If a name is a known ticker (e.g., $BAM), use it.
 3.  **Acronyms:** For names with 3+ words, create an acronym.
-4.  **Combination:** Otherwise, combine and truncate words.
+4.  **Combination:** Otherwise, combine and truncate words to a **MAX of 10 characters.**
 
 **//-- SUCCESS & FAILURE CASE STUDIES --//**
 -   **TWEET 1:** Text: "let jito cook BAM 💥" | IMAGE: Chef with "Jito" on hat.
@@ -112,7 +119,7 @@ Now, await the user's data and execute your directives. Your entire response mus
         -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
         
         **YOUR TASK:**
-        Execute your directives. Prioritize creative fusion but guarantee 10 concrete, literal results. Your first 3 suggestions are your strongest.
+        Execute your directives. Prioritize creative fusion but guarantee 10 concrete, literal results that adhere strictly to the character limits. Your first 3 suggestions are your strongest.
         
         JSON Output:
         `;
