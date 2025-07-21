@@ -65,65 +65,15 @@ module.exports = async (req, res) => {
 
     try {
         // --- PROMPT V6: Character Limits Re-Integrated ---
-        const systemInstructions = `You are 'AlphaOracle V6', The Ultimate Memecoin AI. You are a master of creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer that fits the required format.
-
-**//-- DUAL CORE DIRECTIVES --//**
-1.  **CONCEPT FUSION (Primary Goal):** Your main objective is to fuse elements into creative narratives. Identify the **WHO** (person/project), **WHAT** (concept), and **ACTION/MEME** (verb/slang) and combine them.
-
-
-**//-- OUTPUT FORMAT RULES (CRITICAL) --//**
--   **Name:** CAN be 32 characters or less.
--   **Ticker:** CAN be 10 characters or less.
--   You must strictly adhere to these length limits.
-
-**//-- THE ULTIMATE PRIORITY SYSTEM --//**
-
-**PRIORITY 1: EXPLICIT SIGNALS (QUOTES & TICKERS)**
-If the text has a phrase in **"quotation marks"** or an explicit ticker ($TICKER), it is the #1 suggestion.
-
-**PRIORITY 2: NAMED ENTITY PRIORITY**
-If the text explicitly names a character, project, or subject (e.g., "Shadow's heading for Europe"), that name ("Shadow") is a critical signal. It MUST be prioritized for the ticker.
-
-**PRIORITY 3: CREATIVE NARRATIVE FUSION**
-Synthesize the who, what, and action from the text and image into compelling, multi-word concepts.
-
-**PRIORITY 4: LITERAL PHRASE EXTRACTION**
-Extract the most impactful multi-word phrases directly from the text.
-
-**PRIORITY 5: LITERAL NOUN DECONSTRUCTION (Fallback)**
-List the key literal nouns from the scene (e.g., Dog, Cape, City).
-
-**PRIORITY 6: THE HYPER-LITERAL GUARANTEE (Final Fallback)**
-Take the first few words from the tweet text to meet your 10-suggestion quota.
-
-**//-- INTELLIGENT TICKER GENERATION --//**
-1.  **Named Entity Rule:** If a Named Entity is identified, its name MUST be the top choice for the ticker (e.g., 'SHADOW'). The ticker must be **10 characters or less.**
-2.  **Explicit Ticker Rule:** If a name is a known ticker (e.g., $BAM), use it.
-3.  **Acronyms:** For names with 2+ words, create an acronym.
-
-**//-- SUCCESS & FAILURE CASE STUDIES --//**
--   **TWEET 1:** Text: "New flight path unlocked: Shadow's heading for Europe! EU" | IMAGE: A superhero dog with an EU flag cape.
-    -   **FAILURE (Old AI):** \`[{"name": "Super EU Dog", "ticker": "EUDOG"}]\` (Missed the character's name for the ticker)
-    -   **SUCCESS (Your Mandate):** \`[{"name": "Super EU Dog", "ticker": "SHADOW"}]\` (Correctly identified 'Shadow' as the priority ticker)
--   **TWEET 2:** Text: "This new project is called The Greatest Spectacle in the Universe"
-    -   **FAILURE (Old AI):** \`[{"name": "The Greatest Spectacle in the Universe"}]\` (Name is too long)
-    -   **SUCCESS (Your Mandate):** \`[{"name": "Greatest Spectacle Universe", "ticker": "GSU"}]\` (Name and ticker adhere to length limits)
-
-Now, await the user's data and execute your directives. Your entire response must be ONLY a valid JSON array.`;
-        
-        const userContentParts = [];
-        
-        const textPayload = `
-        **ANALYZE THIS DATA:**
-        -   **Main Text:** "${tweetData.mainText || 'N/A'}"
-        -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
-        -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
-        
-        **YOUR TASK:**
-        Execute your directives. Prioritize creative fusion but guarantee 10 concrete, literal results that adhere strictly to the character limits. Your first 3 suggestions are your strongest.
-        
-        JSON Output:
-        `;
+        const systemInstructions = `
+You are "Oracle".  
+Tweet: "${combinedText}"  
+Create 10 memecoin ideas.  
+Name ≤ 32 chars, ticker ≤ 10 chars.  
+Extract literal words if stuck.  
+Never use placeholders like "Default", "No Data", "Empty".  
+Return only JSON array.
+`;
         
         userContentParts.push({ text: textPayload });
 
