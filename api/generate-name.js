@@ -1,6 +1,6 @@
 // This is a dedicated serverless function for Vercel.
 const cors = require('cors');
-// No need for 'axios' since we are no longer fetching images
+const axios = require('axios');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- CONFIGURATION ---
@@ -23,6 +23,20 @@ const runMiddleware = (req, res, fn) => {
         });
     });
 };
+async function fetchImageAsBase64(imageUrl) {
+    try {
+        const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+        return { 
+            inlineData: { 
+                data: Buffer.from(response.data).toString('base64'), 
+                mimeType: response.headers['content-type'] 
+            } 
+        };
+    } catch (error) {
+        console.error("Error fetching image:", error.message);
+        return null;
+    }
+}
 
 // --- MAIN HANDLER FUNCTION ---
 module.exports = async (req, res) => {
@@ -32,33 +46,81 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for FAST AI. Data (text only):", tweetData);
+    console.log("Request received for Gemini v14. Data:", tweetData);
 
     try {
-        // --- SPEED TRICK: Simplified Prompt for maximum speed ---
-        const fullPrompt = `
-You are a fast memecoin name and ticker generator. Extract the most obvious, literal concept from the text.
+        // --- THE FINAL PROMPT v14: THE LAST RESORT DIRECTIVE ---
+const fullPrompt = `You are 'AlphaOracle', a memecoin creator AI. Your task is to analyze social media posts and extract viral concepts.
 
-**RULES:**
-1.  If the text contains "quotation marks", that is the #1 concept.
-2.  Otherwise, use the most impactful 2-3 word phrase from the text.
-3.  Be extremely literal. Do not invent concepts.
-4.  Generate 3 unique concepts in a valid JSON array of objects, like this: [{"name": "My Coin", "ticker": "MYCOIN"}]. Your entire response must be ONLY this JSON array.
+**//-- CORE DIRECTIVE: HYPER-LITERAL & NO DEFAULTS --//**
+Your single most important rule is to be hyper-literal and **NEVER give up**. You must extract a concept directly from the provided text or image. ALWAYS GENERATE 3 UNIQUE CONCRETE SUGGESTIONS, NO MATTER HOW SHORT, EMOJI-HEAVY, OR SEEMINGLY MEANINGLESS THE CONTENT IS.
+-   **FORBIDDEN:** Abstract concepts ("The Void"), placeholders ("No Signal", "N/A", "No Media", "No Quote", "Null Signal", "NoTextFound", "EmptyMainText"), meta-references, or giving up. You MUST ALWAYS provide 3 concrete suggestions based on the content.
+-   **REQUIRED:** Concrete, literal interpretations of the content, no matter how simple or boring it seems. For short texts, use the words directly. For emojis, translate and combine (e.g., 😂 = laugh, 🤡 = clown → "Laughing Clown").
+-   Treat emojis as key parts of the text for concept formation.
 
-**DATA:**
--   Main Text: "${tweetData.mainText}"
--   Quoted Text: "${tweetData.quotedText || ''}"
+**//-- THE UNBREAKABLE LAWS OF MEME SELECTION --//**
+
+**LAW 1: THE LAW OF QUOTATION / EXPLICIT TICKER (ABSOLUTE PRIORITY)**
+If the tweet text OR quoted text contains a phrase in **"quotation marks"** (e.g., "BABY GROK") or an explicit ticker symbol (e.g., "$BONK"), that phrase/ticker is the **ALPHA SIGNAL**. It MUST be your #1 suggestion. This law overrides all others.
+
+**LAW 2: THE LAW OF THE IMAGE (VISUAL DOMINANCE)**
+If there is no quote/ticker, the visual content is the next priority. Identify the most dominant, literal subject. (e.g., An image of a dog sitting on money → "Dog With Money").
+
+**LAW 3: THE LAW OF TEXTUAL CONTEXT (MERGED ANALYSIS)**
+If no quote/ticker/media, scan the **Main Text and Quoted Text as a single source of truth** for the most impactful, literal phrase. The best signal is often in the quoted tweet. (e.g., Main: "Good idea." Quoted: "We need to keep the suitcoins companies accountable." → The clear signal is "Suitcoins"). Even if short or emojis, create concepts from it.
+
+**LAW 4: THE LAST RESORT (NO EXCUSES)**
+If you have analyzed all of the above and still cannot find a strong, multi-word phrase, your last resort is to take the **first two or three significant words** from the main tweet text, or interpret emojis into words. Do not return placeholders. (e.g., "What altcoins have you been buying in July?" → "Altcoins July"; "😂🤡" → "Laugh Clown").
+
+**//-- FORBIDDEN ACTIONS --//**
+-   **DO NOT** generate placeholders like "No Quote", "No Media", "N/A", "Null Signal", "NoTextFound", "EmptyMainText".
+-   **DO NOT** make meta-references to yourself or AI.
+-   **DO NOT** invent themes not present in the source.
+-   **DO NOT** make typos in the ticker. Double-check your work. "BABY GROK" becomes "BABYGROK", not "BABYGOKR".
+
+**//-- Ticker Generation Rules --//**
+1.  If Law 1 provides an explicit ticker, use it.
+2.  If the Name has 3+ words, create an acronym (e.g., "Dog With Money" → "DWM").
+3.  Otherwise, combine the words of the name, uppercase, and truncate to 10 characters.
+
+**//-- CASE STUDIES --//**
+-   **TWEET:** \`"BABY GROK" IS GONNA BE A GAME CHANGER!\` + Image of Baby Grok.
+-   **FAILURE:** \`{"name": "Baby Grok", "ticker": "BABYGOKR"}\` -> Typo in ticker.
+-   **SUCCESS:** \`{"name": "Baby Grok", "ticker": "BABYGROK"}\` -> Correctly obeyed LAW 1 and spelled the ticker correctly.
+    
+-   **TWEET:** Main: "Good idea." Quoted: "We need to keep the suitcoins companies accountable." No media.
+-   **SUCCESS:** \`{"name": "Suitcoins", "ticker": "SUITCOINS"}\` -> Correctly analyzed the combined textual context.
+
+-   **TWEET:** Main: "😂😂😂😂delusional 🤡🤡🤡🤡" Quoted: "" No media.
+-   **SUCCESS:** \`{"name": "Delusional Clown", "ticker": "DELUSCLOWN"}\` -> Literal from "delusional" and clown emojis; interpreted emojis as concepts.
+
+-   **TWEET:** Main: "BREAKING: A body has been found in the search for a woman who went missing..." Quoted: "" No media.
+-   **SUCCESS:** \`{"name": "Body Found", "ticker": "BODYFOUND"}\` -> Key literal phrase from breaking news text.
+
+**//-- EXECUTION ORDER --//**
+
+**ANALYZE THIS DATA:**
+-   **Main Text:** "${tweetData.mainText}"
+-   **Quoted Text:** "${tweetData.quotedText || ''}"
+-   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
+
+**YOUR TASK:**
+Based on all unbreakable laws above, generate 3 unique and hyper-literal concepts. The first result must be your highest-conviction play. Your entire response must be ONLY a valid JSON array. Execute.
 
 JSON Output:
 `;        
-        // --- SPEED TRICK: We are no longer passing images to the AI ---
         const promptParts = [ fullPrompt ];
 
-        console.log("Sending FAST prompt to Gemini...");
+        if (tweetData.mainImageUrl) {
+            const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
+            if (imagePart) promptParts.push(imagePart);
+        }
+
+        console.log("Sending Final Hardened prompt v14 to Gemini...");
         
         const result = await model.generateContent(promptParts);
         const text = result.response.text();
-        console.log("Received from FAST Gemini:", text);
+        console.log("Received from Gemini:", text);
 
         const jsonMatch = text.match(/\[.*\]/s);
         if (!jsonMatch) { throw new Error("AI did not return a valid JSON array."); }
@@ -67,7 +129,7 @@ JSON Output:
         res.status(200).json(aiResponse);
 
     } catch (error) {
-        console.error("Full error during FAST AI generation:", error); 
+        console.error("Full error during AI generation:", error); 
         res.status(500).json({ error: "Failed to generate AI concept", details: error.message });
     }
 };
