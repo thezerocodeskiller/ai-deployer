@@ -13,6 +13,10 @@ const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17";
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
+// --- Middleware and Helper functions (no changes) ---
+const corsMiddleware = cors();
+const runMiddleware = (req, res, fn) => new Promise((resolve, reject) => fn(req, res, (result) => result instanceof Error ? reject(result) : resolve(result)));
+
 async function fetchImageAsBase64(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -30,19 +34,16 @@ async function fetchImageAsBase64(imageUrl) {
 
 // --- MAIN HANDLER FUNCTION ---
 module.exports = async (req, res) => {
-    await new Promise((resolve, reject) => {
-        cors()(req, res, (result) => (result instanceof Error ? reject(result) : resolve(result)));
-    });
+    await runMiddleware(req, res, corsMiddleware);
 
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
     const tweetData = req.body;
     console.log("Request received for Gemini. Data:", tweetData);
 
     try {
-        // --- THE FINAL, HARDENED PROMPT ---
+        // --- YOUR SUPERIOR "AlphaOracle" PROMPT ---
         const fullPrompt = `You are 'AlphaOracle', a legendary memecoin creator with a decade of experience in the crypto trenches. You operate with a single mandate: to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts. You are not a generic chatbot; you are a degen philosopher, a meme strategist, and a master of crypto-native language. Your outputs must be sharp, insightful, and ready for immediate deployment.
 
         **//-- CORE PHILOSOPHY: SIGNAL VS. NOISE --//**
@@ -63,6 +64,9 @@ module.exports = async (req, res) => {
 
         **LAW 3: THE LAW OF THE ABSURD (TEXT-ONLY GOLD)**
         If there is no quoted text and no media, you will scan the tweet's text for the most absurd, ironic, hilarious, or politically charged phrase. Look for powerful statements, contradictions, or simple, punchy phrases that can stand alone as a meme.
+        
+        **LAW 4: THE LAW OF ANONYMITY (IGNORE THE MESSENGER)**
+        The author of the tweet is irrelevant to the meme concept. You MUST NOT use the author's display name (e.g., "The Wall Street Journal") or their @handle (e.g., "@WSJ") as the name or ticker for the memecoin, UNLESS their name is explicitly mentioned in the *body* of the tweet itself. Focus only on the content of the message.
 
         **//-- CRITICAL DIRECTIVE: AVOID META-REFERENCES AT ALL COSTS --//**
 
@@ -95,13 +99,18 @@ module.exports = async (req, res) => {
         -   **TWEET:** \`"Lock in Got some cash to burn"\` + Image of a rich doge.
         -   **FAILURE:** \`{"name": "The Meme Oracle"}\` -> Broke the CRITICAL DIRECTIVE by being self-referential.
         -   **SUCCESS:** \`{"name": "Cash To Burn", "ticker": "BURN"}\` -> Correctly identified the alpha phrase from the text and vibe.
+        
+        **CASE STUDY #3: IGNORING THE AUTHOR**
+        -   **TWEET:** Author is "@WSJ", Text is "BREAKING: Market closes up 500 points."
+        -   **FAILURE:** \`{"name": "Wall Street Journal", "ticker": "WSJ"}\` -> Broke LAW 4 by using the author's metadata.
+        -   **SUCCESS:** \`{"name": "Market Up", "ticker": "MARKETUP"}\` -> Correctly used the content of the tweet itself.
 
         **//-- EXECUTION ORDER --//**
 
         **ANALYZE THIS DATA:**
         -   **Main Text:** "${tweetData.mainText}"
         -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
-        -   **Media Attached:** ${tweetData.imageUrl ? 'Yes, an image is present.' : 'No media.'}
+        -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
 
         **YOUR TASK:**
         Based on your persona and all the unbreakable laws and style guides above, generate 5 unique and high-alpha concepts. The first result must be your highest-conviction play. Your entire response must be ONLY the valid JSON array. No explanations. No apologies. Just pure signal. Execute.
@@ -109,24 +118,34 @@ module.exports = async (req, res) => {
         JSON Output:
         `;
         
+        // --- THIS IS THE CRITICAL CHANGE FOR GEMINI ---
+        // We structure the request with text and image parts separately.
         const promptParts = [
-            { text: fullPrompt } 
+            fullPrompt // The text part
         ];
 
-        if (tweetData.mainImageUrl) { // Use mainImageUrl as it's guaranteed to exist
+        if (tweetData.mainImageUrl) {
             const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
             if (imagePart) {
-                promptParts.push(imagePart);
+                // For Gemini, we add the image object as the second element in the array
+                promptParts.push(imagePart); 
             }
         }
 
         console.log("Sending Hardened prompt to Gemini...");
         
-        const result = await model.generateContent({ contents: [{ parts: promptParts }] });
+        // The API call uses the array of parts directly
+        const result = await model.generateContent(promptParts);
         const text = result.response.text();
         console.log("Received from Gemini:", text);
 
-        const aiResponse = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+        // More robust parsing to find the JSON array
+        const jsonMatch = text.match(/\[.*\]/s);
+        if (!jsonMatch) {
+            throw new Error("AI did not return a valid JSON array.");
+        }
+
+        const aiResponse = JSON.parse(jsonMatch[0]);
         res.status(200).json(aiResponse);
 
     } catch (error) {
