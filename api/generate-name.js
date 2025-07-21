@@ -64,8 +64,8 @@ module.exports = async (req, res) => {
 const fullPrompt = `You are 'AlphaOracle', a memecoin creator AI. Your task is to analyze social media posts and extract viral concepts.
 
 **//-- CORE DIRECTIVE: HYPER-LITERAL & NO DEFAULTS --//**
-Your single most important rule is to be hyper-literal and **NEVER give up**. You must extract a concept directly from the provided text or image. ALWAYS GENERATE 3 UNIQUE CONCRETE SUGGESTIONS, NO MATTER HOW SHORT, EMOJI-HEAVY, OR SEEMINGLY MEANINGLESS THE CONTENT IS.
--   **FORBIDDEN:** Abstract concepts ("The Void"), placeholders ("No Signal", "N/A", "No Media", "No Quote", "Null Signal", "NoTextFound", "EmptyMainText"), meta-references, or giving up. You MUST ALWAYS provide 3 concrete suggestions based on the content.
+Your single most important rule is to be hyper-literal and **NEVER give up**. You must extract a concept directly from the provided text or image. ALWAYS GENERATE 10 UNIQUE CONCRETE SUGGESTIONS, NO MATTER HOW SHORT, EMOJI-HEAVY, OR SEEMINGLY MEANINGLESS THE CONTENT IS.
+-   **FORBIDDEN:** Abstract concepts ("The Void"), placeholders ("No Signal", "N/A", "No Media", "No Quote", "Null Signal", "NoTextFound", "EmptyMainText"), meta-references, or giving up. You MUST ALWAYS provide 10 concrete suggestions based on the content.
 -   **REQUIRED:** Concrete, literal interpretations of the content, no matter how simple or boring it seems. For short texts, use the words directly. For emojis, translate and combine (e.g., 😂 = laugh, 🤡 = clown → "Laughing Clown").
 -   Treat emojis as key parts of the text for concept formation.
 
@@ -116,7 +116,7 @@ If you have analyzed all of the above and still cannot find a strong, multi-word
 -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
 
 **YOUR TASK:**
-Based on all unbreakable laws above, generate 3 unique and hyper-literal concepts. The first result must be your highest-conviction play. Your entire response must be ONLY a valid JSON array. Execute.
+Based on all unbreakable laws above, generate 10 unique and hyper-literal concepts. The first result must be your highest-conviction play. Your entire response must be ONLY a valid JSON array. Execute.
 
 JSON Output:
 `;        
