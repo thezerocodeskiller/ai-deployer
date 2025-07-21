@@ -1,5 +1,3 @@
-
-
 // This is a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
