@@ -10,7 +10,7 @@ if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
 // Using a slightly more advanced model which may yield better results with complex prompts
-const MODEL_NAME = "gemini-1.5-flash-preview-0514"; 
+const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
