@@ -9,13 +9,11 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-// UNCHANGED: Using your specified model
 const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: MODEL_NAME,
-    // UNCHANGED: safetySettings are empty as you had it
     safetySettings: [
     ]
 });
@@ -45,7 +43,7 @@ async function fetchAndProcessImage(imageUrl) {
             } 
         };
     } catch (error) {
-        console.error("Error fetching or processing image:", error.message);
+        console.error(`Error processing image ${imageUrl}:`, error.message);
         return null;
     }
 }
@@ -58,10 +56,10 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini (V5 + Char Limits). Data:", tweetData);
+    console.log("Request received for Gemini (V5 + Multi-Image). Data:", tweetData);
 
     try {
-        // --- PROMPT V5: With Character Limits Added ---
+        // --- YOUR PROMPT (UNCHANGED) ---
         const systemInstructions = `You are 'AlphaOracle V5', The Ultimate Memecoin AI. You are a master of creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer that fits the required format.
 
 **//-- DUAL CORE DIRECTIVES --//**
@@ -112,11 +110,12 @@ Now, await the user's data and execute your directives. Your entire response mus
         
         const userContentParts = [];
         
+        // --- NEW: Multi-Image Text Payload ---
         const textPayload = `
         **ANALYZE THIS DATA:**
         -   **Main Text:** "${tweetData.mainText || 'N/A'}"
         -   **Quoted Text:** "${tweetData.quotedText || 'N/A'}"
-        -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
+        -   **Media Attached:** ${tweetData.mainImageUrls && tweetData.mainImageUrls.length > 0 ? `Yes, ${tweetData.mainImageUrls.length} image(s) present.` : 'No media.'}
         
         **YOUR TASK:**
         Execute your directives. Prioritize creative fusion but guarantee 10 concrete, literal results that adhere strictly to the character limits. Your first 3 suggestions are your strongest.
@@ -126,11 +125,16 @@ Now, await the user's data and execute your directives. Your entire response mus
         
         userContentParts.push({ text: textPayload });
 
-        if (tweetData.mainImageUrl) {
-            const imagePart = await fetchAndProcessImage(tweetData.mainImageUrl);
-            if (imagePart) {
-                userContentParts.push(imagePart);
+        // --- NEW: Loop to process all images ---
+        if (tweetData.mainImageUrls && tweetData.mainImageUrls.length > 0) {
+            console.log(`Processing ${tweetData.mainImageUrls.length} image(s)...`);
+            for (const imageUrl of tweetData.mainImageUrls) {
+                const imagePart = await fetchAndProcessImage(imageUrl);
+                if (imagePart) {
+                    userContentParts.push(imagePart);
+                }
             }
+            console.log("All images processed.");
         }
         
         const chat = model.startChat({
