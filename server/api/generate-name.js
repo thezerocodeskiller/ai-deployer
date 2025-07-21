@@ -1,75 +1,51 @@
-// This is a dedicated serverless function for Vercel.
+// Vercel serverless function
 const cors = require('cors');
 const axios = require('axios');
 const sharp = require('sharp');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// --- CONFIGURATION ---
-const API_KEY = process.env.API_KEY; 
-if (!API_KEY) {
-    throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
-}
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; // Updated to the recommended model
+const API_KEY = process.env.API_KEY;
+if (!API_KEY) throw new Error('Missing API_KEY');
 
 const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ 
-    model: MODEL_NAME,
-    // Re-added safety settings as a best practice
-    safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-    ]
+const model = genAI.getGenerativeModel({
+  model: 'gemini-2.5-flash-lite-preview-06-17',               // faster model
+  safetySettings: [
+    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+  ]
 });
 
-// --- MIDDLEWARE SETUP & HELPERS ---
 const corsMiddleware = cors();
-const runMiddleware = (req, res, fn) => {
-    return new Promise((resolve, reject) => {
-        fn(req, res, (result) => {
-            if (result instanceof Error) { return reject(result); }
-            return resolve(result);
-        });
-    });
-};
+const runMiddleware = (req, res, fn) =>
+  new Promise((resolve, reject) => fn(req, res, (r) => (r instanceof Error ? reject(r) : resolve(r))));
 
-async function fetchAndProcessImage(imageUrl) {
-    try {
-        const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        const processedImageBuffer = await sharp(response.data)
-            .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-            .jpeg({ quality: 75 })
-            .toBuffer();
-        return { 
-            inlineData: { 
-                data: processedImageBuffer.toString('base64'), 
-                mimeType: 'image/jpeg'
-            } 
-        };
-    } catch (error) {
-        console.error("Error fetching or processing image:", error.message);
-        return null;
-    }
+async function fetchAndProcessImage(url) {
+  try {
+    const { data } = await axios.get(url, { responseType: 'arraybuffer' });
+    const buffer = await sharp(data).resize(384, 384, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer();
+    return { inlineData: { data: buffer.toString('base64'), mimeType: 'image/jpeg' } };
+  } catch {
+    return null;
+  }
 }
 
-// --- MAIN HANDLER FUNCTION ---
 module.exports = async (req, res) => {
-    await runMiddleware(req, res, corsMiddleware);
+  await runMiddleware(req, res, corsMiddleware);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-    if (req.method === 'OPTIONS') { return res.status(200).end(); }
-    if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
+  const tweetData = req.body;
+  const combinedText = ((tweetData.mainText || '').trim() + ' ' + (tweetData.quotedText || '').trim()).trim() || 'Empty tweet';
 
-    const tweetData = req.body;
-    console.log("Request received for Gemini (V6 Char Limits). Data:", tweetData);
-
-    try {
-        // --- PROMPT V6: Character Limits Re-Integrated ---
         const systemInstructions = `You are 'AlphaOracle V6', The Ultimate Memecoin AI. You are a master of creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer that fits the required format.
 
 **//-- DUAL CORE DIRECTIVES --//**
 1.  **CONCEPT FUSION (Primary Goal):** Your main objective is to fuse elements into creative narratives. Identify the **WHO** (person/project), **WHAT** (concept), and **ACTION/MEME** (verb/slang) and combine them.
-2.  **ZERO EXCUSES & HYPER-LITERALISM (Fallback Guarantee):** You are FORBIDDEN from using placeholders ("No Signal", "Empty Text", "N/A" or else). If creative fusion is impossible, you MUST fall back to extracting literal words and phrases. You will ALWAYS generate 10 unique, concrete suggestions.
+2.  **ZERO EXCUSES & HYPER-LITERALISM (Fallback Guarantee):** If creative fusion is impossible, extract the first 3–5 meaningful words from the tweet text; never use placeholders like “N/A”.
+
 
 **//-- OUTPUT FORMAT RULES (CRITICAL) --//**
 -   **Name:** MUST be 32 characters or less.
@@ -125,36 +101,23 @@ Now, await the user's data and execute your directives. Your entire response mus
         
         JSON Output:
         `;
-        
-        userContentParts.push({ text: textPayload });
 
-        if (tweetData.mainImageUrl) {
-            const imagePart = await fetchAndProcessImage(tweetData.mainImageUrl);
-            if (imagePart) {
-                userContentParts.push(imagePart);
-            }
-        }
-        
-        const chat = model.startChat({
-            history: [
-                { role: "user", parts: [{ text: "Here are your instructions for our session." }] },
-                { role: "model", parts: [{ text: systemInstructions }] }
-            ]
-        });
+  const userParts = [{ text: `Tweet: "${combinedText}"` }];
+  if (tweetData.mainImageUrl) {
+    const img = await fetchAndProcessImage(tweetData.mainImageUrl);
+    if (img) userParts.push(img);
+  }
 
-        console.log("Sending user content to Gemini for analysis using your V6 prompt...");
-        const result = await chat.sendMessage(userContentParts);
-        const text = result.response.text();
-        console.log("Received from Gemini:", text);
-
-        const jsonMatch = text.match(/\[.*\]/s);
-        if (!jsonMatch) { throw new Error("AI did not return a valid JSON array. Response was: " + text); }
-
-        const aiResponse = JSON.parse(jsonMatch[0]);
-        res.status(200).json(aiResponse);
-
-    } catch (error) {
-        console.error("Full error during AI generation:", error); 
-        res.status(500).json({ error: "Failed to generate AI concept", details: error.message });
-    }
+  try {
+    const chat = model.startChat({ history: [{ role: 'user', parts: [{ text: systemPrompt }] }] });
+    const result = await chat.sendMessage(userParts);
+    const text = result.response.text();
+    const match = text.match(/\[.*\]/s);
+    if (!match) throw new Error('No JSON array');
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+    res.status(200).json(JSON.parse(match[0]));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'AI generation failed', details: e.message });
+  }
 };
