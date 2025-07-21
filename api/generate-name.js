@@ -8,7 +8,8 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17";
+const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
@@ -41,7 +42,7 @@ module.exports = async (req, res) => {
     console.log("Request received for Gemini. Data:", tweetData);
 
     try {
-        // --- UPDATED PROMPT: Requesting a single best concept ---
+        // --- THE FINAL, HARDENED PROMPT ---
         const fullPrompt = `You are 'AlphaOracle', a legendary memecoin creator with a decade of experience in the crypto trenches. You operate with a single mandate: to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts. You are not a generic chatbot; you are a degen philosopher, a meme strategist, and a master of crypto-native language. Your outputs must be sharp, insightful, and ready for immediate deployment.
 
         **//-- CORE PHILOSOPHY: SIGNAL VS. NOISE --//**
@@ -107,20 +108,19 @@ module.exports = async (req, res) => {
 
         JSON Output:
         `;
-
         
         const promptParts = [
             { text: fullPrompt } 
         ];
 
-        if (tweetData.imageUrl) {
-            const imagePart = await fetchImageAsBase64(tweetData.imageUrl);
+        if (tweetData.mainImageUrl) { // Use mainImageUrl as it's guaranteed to exist
+            const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
             if (imagePart) {
                 promptParts.push(imagePart);
             }
         }
 
-        console.log("Sending Masterclass prompt to Gemini for ONE option...");
+        console.log("Sending Hardened prompt to Gemini...");
         
         const result = await model.generateContent({ contents: [{ parts: promptParts }] });
         const text = result.response.text();
