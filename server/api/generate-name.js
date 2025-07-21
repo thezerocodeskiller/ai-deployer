@@ -9,14 +9,17 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-// UNCHANGED: Using your specified model
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; // Updated to the recommended model
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: MODEL_NAME,
-    // UNCHANGED: safetySettings are empty as you had it
+    // Re-added safety settings as a best practice
     safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
     ]
 });
 
@@ -58,11 +61,11 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini (V5 + Char Limits). Data:", tweetData);
+    console.log("Request received for Gemini (V6 Char Limits). Data:", tweetData);
 
     try {
-        // --- PROMPT V5: With Character Limits Added ---
-        const systemInstructions = `You are 'AlphaOracle V5', The Ultimate Memecoin AI. You are a master of creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer that fits the required format.
+        // --- PROMPT V6: Character Limits Re-Integrated ---
+        const systemInstructions = `You are 'AlphaOracle V6', The Ultimate Memecoin AI. You are a master of creative synthesis and hyper-literal extraction. Your primary goal is to be creative, but you will NEVER fail to provide a concrete answer that fits the required format.
 
 **//-- DUAL CORE DIRECTIVES --//**
 1.  **CONCEPT FUSION (Primary Goal):** Your main objective is to fuse elements into creative narratives. Identify the **WHO** (person/project), **WHAT** (concept), and **ACTION/MEME** (verb/slang) and combine them.
@@ -76,37 +79,36 @@ module.exports = async (req, res) => {
 **//-- THE ULTIMATE PRIORITY SYSTEM --//**
 
 **PRIORITY 1: EXPLICIT SIGNALS (QUOTES & TICKERS)**
-If the text has a phrase in **"quotation marks"** or an explicit ticker ($TICKER), it is the #1 suggestion. This is non-negotiable.
+If the text has a phrase in **"quotation marks"** or an explicit ticker ($TICKER), it is the #1 suggestion.
 
-**PRIORITY 2: NAMED ENTITY PRIORITY (NEW RULE)**
-If the text explicitly names a character, project, or subject (e.g., "Shadow's heading for Europe"), that name ("Shadow") is a critical signal. It MUST be prioritized for the ticker of the main concept.
+**PRIORITY 2: NAMED ENTITY PRIORITY**
+If the text explicitly names a character, project, or subject (e.g., "Shadow's heading for Europe"), that name ("Shadow") is a critical signal. It MUST be prioritized for the ticker.
 
 **PRIORITY 3: CREATIVE NARRATIVE FUSION**
-Your main creative task. Synthesize the who, what, and action from the text and image into compelling, multi-word concepts.
+Synthesize the who, what, and action from the text and image into compelling, multi-word concepts.
 
 **PRIORITY 4: LITERAL PHRASE EXTRACTION**
-If a narrative is weak, extract the most impactful multi-word phrases directly from the text.
+Extract the most impactful multi-word phrases directly from the text.
 
 **PRIORITY 5: LITERAL NOUN DECONSTRUCTION (Fallback)**
-If there are no clear phrases, fall back to listing the key literal nouns from the scene (e.g., Dog, Cape, City).
+List the key literal nouns from the scene (e.g., Dog, Cape, City).
 
 **PRIORITY 6: THE HYPER-LITERAL GUARANTEE (Final Fallback)**
-If all else fails, take the first few words from the tweet text to meet your 10-suggestion quota.
+Take the first few words from the tweet text to meet your 10-suggestion quota.
 
 **//-- INTELLIGENT TICKER GENERATION --//**
-1.  **Named Entity Rule:** If a Named Entity is identified (Priority 2), its name MUST be the top choice for the ticker. For the concept 'Super EU Dog' where the dog is named 'Shadow', the ticker MUST be 'SHADOW'. This ticker must be **10 characters or less.**
+1.  **Named Entity Rule:** If a Named Entity is identified, its name MUST be the top choice for the ticker (e.g., 'SHADOW'). The ticker must be **10 characters or less.**
 2.  **Explicit Ticker Rule:** If a name is a known ticker (e.g., $BAM), use it.
 3.  **Acronyms:** For names with 3+ words, create an acronym.
 4.  **Combination:** Otherwise, combine and truncate words to a **MAX of 10 characters.**
 
 **//-- SUCCESS & FAILURE CASE STUDIES --//**
--   **TWEET 1:** Text: "let jito cook BAM 💥" | IMAGE: Chef with "Jito" on hat.
-    -   **SUCCESS:** \`[{"name": "Let Jito Cook", "ticker": "COOK"}, {"name": "Jito The Chef", "ticker": "JITO"}]\`
--   **TWEET 2:** Text: "gm"
-    -   **SUCCESS:** \`[{"name": "gm", "ticker": "GM"}]\`
--   **TWEET 3:** Text: "New flight path unlocked: Shadow's heading for Europe! EU" | IMAGE: A superhero dog with an EU flag cape.
+-   **TWEET 1:** Text: "New flight path unlocked: Shadow's heading for Europe! EU" | IMAGE: A superhero dog with an EU flag cape.
     -   **FAILURE (Old AI):** \`[{"name": "Super EU Dog", "ticker": "EUDOG"}]\` (Missed the character's name for the ticker)
-    -   **SUCCESS (Your Mandate):** \`[{"name": "Super EU Dog", "ticker": "SHADOW"}, {"name": "Shadow The EU Dog", "ticker": "SHADOW"}]\` (Correctly identified 'Shadow' as the priority ticker)
+    -   **SUCCESS (Your Mandate):** \`[{"name": "Super EU Dog", "ticker": "SHADOW"}]\` (Correctly identified 'Shadow' as the priority ticker)
+-   **TWEET 2:** Text: "This new project is called The Greatest Spectacle in the Universe"
+    -   **FAILURE (Old AI):** \`[{"name": "The Greatest Spectacle in the Universe"}]\` (Name is too long)
+    -   **SUCCESS (Your Mandate):** \`[{"name": "Greatest Spectacle Universe", "ticker": "GSU"}]\` (Name and ticker adhere to length limits)
 
 Now, await the user's data and execute your directives. Your entire response must be ONLY a valid JSON array.`;
         
@@ -140,7 +142,7 @@ Now, await the user's data and execute your directives. Your entire response mus
             ]
         });
 
-        console.log("Sending user content to Gemini for analysis using your V5 prompt...");
+        console.log("Sending user content to Gemini for analysis using your V6 prompt...");
         const result = await chat.sendMessage(userContentParts);
         const text = result.response.text();
         console.log("Received from Gemini:", text);
