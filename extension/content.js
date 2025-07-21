@@ -10,64 +10,116 @@ function simulateTyping(inputElement, text) {
 }
 
 // --- DATA EXTRACTION FUNCTION (Reverted to a more stable version) ---
+// --- DATA EXTRACTION FUNCTION (FIXED & IMPROVED - Uxento AI Sniper v17) ---
 function extractTweetData(tweetElement) {
     const data = { 
         mainText: '', 
         quotedText: '', 
         author: '',
         twitterUrl: '',
-        mainImageUrl: null,
+        mainImageUrls: [], // Changed to an array to hold multiple images/videos
         profileImageUrl: null,
         isContentTweet: true
     };
-    
+
+    // 1. --- Initial Sanity Checks (Kept from original) ---
+    // Instantly skip non-content cards like "Follow suggestions"
     if (tweetElement.querySelector('svg.lucide-user-plus, svg.lucide-user-minus')) {
         data.isContentTweet = false;
         return data;
     }
-    
-    const viewLink = tweetElement.querySelector('a[href*="/status/"]');
-    if (viewLink) data.twitterUrl = viewLink.href;
 
-    const authorHeader = tweetElement.querySelector('div[class*="flex items-center gap-3 p-4"]');
+    // A tweet must be inside an <article> tag. If not found, exit.
+    const article = tweetElement.querySelector('article');
+    if (!article) {
+        data.isContentTweet = false;
+        return data;
+    }
+
+    // 2. --- Extract Basic Author and URL Information ---
+    // This part is generally stable. Find the author's header and the permalink.
+    const authorHeader = article.querySelector('a[href*="/status/"]');
     if (authorHeader) {
-        const authorLink = authorHeader.querySelector('a[href^="https://x.com/"]');
-        if (authorLink) data.author = authorLink.href.split('/').pop().toLowerCase();
-        
-        const avatarElement = authorHeader.querySelector('img');
-        if (avatarElement) {
-            data.profileImageUrl = avatarElement.src.replace('_normal', '_400x400');
+        data.twitterUrl = authorHeader.href;
+        const authorLink = authorHeader.closest('div[class*="flex items-center"]').querySelector('a[href^="https://x.com/"]');
+        if (authorLink) {
+            data.author = authorLink.href.split('/').pop().toLowerCase();
+            const avatarImg = authorLink.querySelector('img');
+            if (avatarImg) {
+                data.profileImageUrl = avatarImg.src.replace('_normal', '_400x400');
+            }
         }
     }
     
-    const mainTextElement = tweetElement.querySelector('div[class*="px-4 pb-4 text-sm leading-relaxed"]');
-    if (mainTextElement) data.mainText = mainTextElement.innerText.trim();
+    // Fallback for the tweet URL if the first method fails
+    if (!data.twitterUrl) {
+        const viewLink = article.querySelector('a[href*="/status/"]');
+        if (viewLink) data.twitterUrl = viewLink.href;
+    }
 
-    const quotedTweetContainer = tweetElement.querySelector('div[class*="mx-4 mb-4 p-3 rounded-md"]');
+    // 3. --- Intelligent Text Extraction ---
+    // This is the core of the fix. It finds the main content and cleans it.
+    
+    // Clone the article to manipulate it without affecting the page display
+    const articleClone = article.cloneNode(true);
+    
+    // Find and remove any "Replying to", "Quoting", "Retweeted" headers to not pollute the text
+    articleClone.querySelectorAll('div[class*="text-xs text-"][class*="mb-2"]').forEach(el => el.remove());
+
+    // Find the quoted tweet container within the clone, if it exists
+    const quotedTweetContainer = articleClone.querySelector('div[class*="mx-4 mb-4"], div > div[class*="rounded-md border"]');
+
     if (quotedTweetContainer) {
-        const quotedTextElement = quotedTweetContainer.querySelector('div[class*="text-xs leading-relaxed"]');
-        if (quotedTextElement) data.quotedText = quotedTextElement.innerText.trim();
-    }
-    
-    // Simplified and more robust image search
-    let mainImage = tweetElement.querySelector('img.cursor-zoom-in');
-    if (!mainImage) {
-        const photoLink = tweetElement.querySelector('a[href*="/photo/"]');
-        if (photoLink) mainImage = photoLink.querySelector('img');
-    }
-    
-    if (mainImage) {
-        data.mainImageUrl = mainImage.src;
-    } else {
-        const videoElement = tweetElement.querySelector('video');
-        if (videoElement && videoElement.poster) {
-            data.mainImageUrl = videoElement.poster;
+        // Extract text from the quoted tweet first
+        const quotedTextElement = quotedTweetContainer.querySelector('div[class*="leading-relaxed"]');
+        if (quotedTextElement) {
+            data.quotedText = quotedTextElement.innerText.trim();
         }
+        
+        // IMPORTANT: Now, remove the entire quoted tweet container from the clone
+        // This ensures that when we get the mainText, it doesn't include the quoted text.
+        quotedTweetContainer.remove();
+    }
+    
+    // Now, get the remaining text from the main body of the cloned article
+    // This selector targets the primary text container.
+    const mainTextElement = articleClone.querySelector('div[class*="px-4 pb-4 text-sm"]');
+    if (mainTextElement) {
+        // Cleanup: Some text elements have a div wrapper, some don't. This handles both.
+        const innerDiv = mainTextElement.querySelector('div');
+        data.mainText = (innerDiv ? innerDiv.innerText : mainTextElement.innerText).trim();
+    }
+    
+    // Fallback if the main selector fails (e.g., for very simple text-only tweets)
+    if (!data.mainText) {
+        const simpleText = article.querySelector('div[dir="auto"]');
+        if (simpleText) data.mainText = simpleText.innerText.trim();
     }
 
+
+    // 4. --- Comprehensive Media Extraction (Handles Multiple Images/Videos) ---
+    // Use querySelectorAll to grab every potential media item.
+    // This looks for images inside photo links AND video poster images.
+    const mediaElements = article.querySelectorAll('a[href*="/photo/"] img, video[poster]');
+    
+    mediaElements.forEach(media => {
+        if (media.tagName === 'IMG' && media.src) {
+            data.mainImageUrls.push(media.src);
+        } else if (media.tagName === 'VIDEO' && media.poster) {
+            data.mainImageUrls.push(media.poster);
+        }
+    });
+
+    // 5. --- Final Cleanup and Return ---
+    // If there's no main text, but there is quoted text, the user was likely just quoting.
+    // We can consider the quoted text to be the main signal.
+    if (!data.mainText && data.quotedText) {
+        data.mainText = data.quotedText;
+        data.quotedText = '';
+    }
+    
     return data;
 }
-
 // --- HTML Template for the UI Panel ---
 function getCreationFormTemplate(cardId) {
     return `
