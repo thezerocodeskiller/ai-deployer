@@ -8,7 +8,7 @@ const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+const MODEL_NAME = "gemini-1.5-flash-latest"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -46,46 +46,49 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method Not Allowed' }); }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini. Data:", tweetData);
+    console.log("Request received for Gemini v14. Data:", tweetData);
 
     try {
-        // --- THE FINAL, HYPER-LITERAL PROMPT ---
-        const fullPrompt = `You are 'AlphaOracle', a memecoin creator AI. Your task is to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts.
+        // --- THE FINAL PROMPT v14: THE LAST RESORT DIRECTIVE ---
+        const fullPrompt = `You are 'AlphaOracle', a memecoin creator AI. Your task is to analyze social media posts and extract viral concepts.
 
-        **//-- CORE DIRECTIVE: BE HYPER-LITERAL --//**
-        Your single most important rule is to be hyper-literal. You must extract concepts **directly** from the text or image.
-        -   **FORBIDDEN:** Abstract concepts, metaphors, or ideas that are not explicitly present. (e.g., if you see a blank image, do not suggest "The Void" or "Nothingness").
-        -   **REQUIRED:** Concrete, literal interpretations. (e.g., if the text says "the ticker is $BONK", the primary suggestion MUST be "Bonk").
+        **//-- CORE DIRECTIVE: HYPER-LITERAL & NO DEFAULTS --//**
+        Your single most important rule is to be hyper-literal and **NEVER give up**. You must extract a concept directly from the provided text or image.
+        -   **FORBIDDEN:** Abstract concepts ("The Void"), placeholders ("No Signal", "N/A"), or giving up. You MUST ALWAYS provide 5 concrete suggestions based on the content.
+        -   **REQUIRED:** Concrete, literal interpretations of the content, no matter how simple or boring it seems.
 
         **//-- THE UNBREAKABLE LAWS OF MEME SELECTION --//**
 
-        **LAW 1: THE LAW OF THE EXPLICIT TICKER (ABSOLUTE PRIORITY)**
-        If the tweet text OR the quoted text explicitly mentions a ticker symbol (e.g., "$BONK", "the ticker is BONK"), that ticker is the **ALPHA SIGNAL**. It MUST be your #1 suggestion. This law overrides all others.
+        **LAW 1: THE LAW OF QUOTATION / EXPLICIT TICKER (ABSOLUTE PRIORITY)**
+        If the tweet text OR quoted text contains a phrase in **"quotation marks"** (e.g., "BABY GROK") or an explicit ticker symbol (e.g., "$BONK"), that phrase/ticker is the **ALPHA SIGNAL**. It MUST be your #1 suggestion. This law overrides all others.
 
         **LAW 2: THE LAW OF THE IMAGE (VISUAL DOMINANCE)**
-        If there is no explicit ticker, the visual content (image or video) is the next highest priority. You must identify the most dominant, literal subject in the media. (e.g., An image of a dog sitting on money should be named "Dog With Money" or "Money Dog").
+        If there is no quote/ticker, the visual content is the next priority. Identify the most dominant, literal subject. (e.g., An image of a dog sitting on money -> "Dog With Money").
 
-        **LAW 3: THE LAW OF THE TEXT (LITERAL PHRASE)**
-        If there is no explicit ticker and no media, you will scan the tweet's text for the most impactful, literal phrase. (e.g., "Amid growing outrage over his communist & jihadist policies" -> "Communist Jihadist").
+        **LAW 3: THE LAW OF TEXTUAL CONTEXT (MERGED ANALYSIS)**
+        If no quote/ticker/media, scan the **Main Text and Quoted Text as a single source of truth** for the most impactful, literal phrase. The best signal is often in the quoted tweet. (e.g., Main: "Good idea." Quoted: "We need to keep the suitcoins companies accountable." -> The clear signal is "Suitcoins").
 
-        **//-- CRITICAL DIRECTIVE: AVOID META-REFERENCES --//**
-        Your suggestions must NEVER refer to the process of creating a meme or analyzing signals.
-        -   **FORBIDDEN CONCEPTS:** "The Meme Oracle", "Alpha Sniper", "Signal Fire".
-        -   Your output must be 100% derived from the provided tweet content.
+        **LAW 4: THE LAST RESORT (NO EXCUSES)**
+        If you have analyzed all of the above and still cannot find a strong, multi-word phrase, your last resort is to take the **first two or three significant words** from the main tweet text. Do not return "No Signal". (e.g., "What altcoins have you been buying in July?" -> "Altcoins July").
+
+        **//-- FORBIDDEN ACTIONS --//**
+        -   **DO NOT** generate placeholders like "No Quote", "No Media", "N/A", "Null Signal".
+        -   **DO NOT** make meta-references to yourself or AI.
+        -   **DO NOT** invent themes not present in the source.
+        -   **DO NOT** make typos in the ticker. Double-check your work. "BABY GROK" becomes "BABYGROK", not "BABYGOKR".
 
         **//-- Ticker Generation Rules --//**
-        1.  If Law 1 is triggered, use the explicit ticker.
-        2.  If the Name has 3+ words, create an acronym.
-        3.  Otherwise, combine the words of the name, uppercase, and truncate to 10 characters. (e.g., "Dog With Money" -> "DOGWITHMON").
+        1.  If Law 1 provides an explicit ticker, use it.
+        2.  If the Name has 3+ words, create an acronym (e.g., "Dog With Money" -> "DWM").
+        3.  Otherwise, combine the words of the name, uppercase, and truncate to 10 characters.
 
         **//-- CASE STUDIES --//**
-        -   **TWEET:** "Replying to @user. @user2 Real!" Quoted Tweet: "the ticker is $BONK" + Image of a dog on money.
-        -   **FAILURE:** \`{"name": "The Void"}\` -> Wrongly ignored all context.
-        -   **SUCCESS:** \`{"name": "Bonk", "ticker": "BONK"}\` -> Correctly obeyed LAW 1.
-
-        -   **TWEET:** "Cram Fire in Oregon, the nation's largest blaze in 2025"
-        -   **FAILURE:** \`{"name": "Climate Change"}\` -> Too abstract.
-        -   **SUCCESS:** \`{"name": "Cram Fire", "ticker": "CRAMFIRE"}\` -> Correctly used the literal phrase.
+        -   **TWEET:** \`"BABY GROK" IS GONNA BE A GAME CHANGER!\` + Image of Baby Grok.
+        -   **FAILURE:** \`{"name": "Baby Grok", "ticker": "BABYGOKR"}\` -> Typo in ticker.
+        -   **SUCCESS:** \`{"name": "Baby Grok", "ticker": "BABYGROK"}\` -> Correctly obeyed LAW 1 and spelled the ticker correctly.
+        
+        -   **TWEET:** Main: "Good idea." Quoted: "We need to keep the suitcoins companies accountable." No media.
+        -   **SUCCESS:** \`{"name": "Suitcoins", "ticker": "SUITCOINS"}\` -> Correctly analyzed the combined textual context.
 
         **//-- EXECUTION ORDER --//**
 
@@ -95,7 +98,7 @@ module.exports = async (req, res) => {
         -   **Media Attached:** ${tweetData.mainImageUrl ? 'Yes, an image is present.' : 'No media.'}
 
         **YOUR TASK:**
-        Based on your persona and all the unbreakable laws above, generate 5 unique and hyper-literal concepts. The first result must be your highest-conviction play. Your entire response must be ONLY a valid JSON array. Execute.
+        Based on all unbreakable laws above, generate 5 unique and hyper-literal concepts. The first result must be your highest-conviction play. Your entire response must be ONLY a valid JSON array. Execute.
 
         JSON Output:
         `;
@@ -104,21 +107,17 @@ module.exports = async (req, res) => {
 
         if (tweetData.mainImageUrl) {
             const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
-            if (imagePart) {
-                promptParts.push(imagePart);
-            }
+            if (imagePart) promptParts.push(imagePart);
         }
 
-        console.log("Sending Hyper-Literal prompt to Gemini...");
+        console.log("Sending Final Hardened prompt v14 to Gemini...");
         
         const result = await model.generateContent(promptParts);
         const text = result.response.text();
         console.log("Received from Gemini:", text);
 
         const jsonMatch = text.match(/\[.*\]/s);
-        if (!jsonMatch) {
-            throw new Error("AI did not return a valid JSON array.");
-        }
+        if (!jsonMatch) { throw new Error("AI did not return a valid JSON array."); }
 
         const aiResponse = JSON.parse(jsonMatch[0]);
         res.status(200).json(aiResponse);
