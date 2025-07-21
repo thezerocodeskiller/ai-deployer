@@ -1,27 +1,26 @@
 // This is now a dedicated serverless function for Vercel.
 const cors = require('cors');
 const axios = require('axios');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const OpenAI = require('openai');  // xAI-compatible SDK
 
 // --- CONFIGURATION ---
-const API_KEY = process.env.API_KEY; 
+const API_KEY = process.env.XAI_API_KEY; 
 if (!API_KEY) {
-    throw new Error("FATAL ERROR: API_KEY is not set in environment variables.");
+    throw new Error("FATAL ERROR: XAI_API_KEY is not set in environment variables.");
 }
-const MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"; 
+const MODEL_NAME = "grok-4";  // Confirm in xAI docs; may be 'grok-4' or similar
 
-const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+const openai = new OpenAI({
+    apiKey: API_KEY,
+    baseURL: 'https://api.x.ai/v1'  // xAI's endpoint
+});
 
 async function fetchImageAsBase64(imageUrl) {
     try {
         const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        return { 
-            inlineData: { 
-                data: Buffer.from(response.data).toString('base64'), 
-                mimeType: response.headers['content-type'] 
-            } 
-        };
+        const base64 = Buffer.from(response.data).toString('base64');
+        const mimeType = response.headers['content-type'];
+        return `data:${mimeType};base64,${base64}`;  // Data URL for xAI/OpenAI format
     } catch (error) {
         console.error("Error fetching image:", error.message);
         return null;
@@ -39,10 +38,11 @@ module.exports = async (req, res) => {
     }
 
     const tweetData = req.body;
-    console.log("Request received for Gemini. Data:", tweetData);
+    console.log("Request received for Grok. Data:", tweetData);
 
     try {
         // --- THE FINAL, HARDENED PROMPT ---
+        // (Keep your existing fullPrompt unchanged; Grok handles it well)
         const fullPrompt = `You are 'AlphaOracle', a legendary memecoin creator with a decade of experience in the crypto trenches. You operate with a single mandate: to analyze social media posts and extract the most viral, culturally-potent alpha for new memecoin concepts. You are not a generic chatbot; you are a degen philosopher, a meme strategist, and a master of crypto-native language. Your outputs must be sharp, insightful, and ready for immediate deployment.
 
         **//-- CORE PHILOSOPHY: SIGNAL VS. NOISE --//**
@@ -109,22 +109,26 @@ module.exports = async (req, res) => {
         JSON Output:
         `;
         
-        const promptParts = [
-            { text: fullPrompt } 
-        ];
+        const content = [{ type: 'text', text: fullPrompt }];
 
-        if (tweetData.mainImageUrl) { // Use mainImageUrl as it's guaranteed to exist
-            const imagePart = await fetchImageAsBase64(tweetData.mainImageUrl);
-            if (imagePart) {
-                promptParts.push(imagePart);
+        if (tweetData.mainImageUrl) {  // Use mainImageUrl as it's guaranteed to exist
+            const imageDataUrl = await fetchImageAsBase64(tweetData.mainImageUrl);
+            if (imageDataUrl) {
+                content.push({ type: 'image_url', image_url: { url: imageDataUrl } });
             }
         }
 
-        console.log("Sending Hardened prompt to Gemini...");
+        console.log("Sending hardened prompt to Grok...");
         
-        const result = await model.generateContent({ contents: [{ parts: promptParts }] });
-        const text = result.response.text();
-        console.log("Received from Gemini:", text);
+        const completion = await openai.chat.completions.create({
+            model: MODEL_NAME,
+            messages: [{ role: 'user', content: content }],
+            max_tokens: 1024,  // Adjust based on needs; check xAI docs for limits
+            temperature: 0.7  // Tune for creativity; optional
+        });
+
+        const text = completion.choices[0].message.content;
+        console.log("Received from Grok:", text);
 
         const aiResponse = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
         res.status(200).json(aiResponse);
