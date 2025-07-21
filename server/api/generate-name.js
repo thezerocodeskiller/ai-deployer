@@ -69,12 +69,11 @@ module.exports = async (req, res) => {
 
 **//-- DUAL CORE DIRECTIVES --//**
 1.  **CONCEPT FUSION (Primary Goal):** Your main objective is to fuse elements into creative narratives. Identify the **WHO** (person/project), **WHAT** (concept), and **ACTION/MEME** (verb/slang) and combine them.
-2.  **ZERO EXCUSES & HYPER-LITERALISM (Fallback Guarantee):** If creative fusion is impossible, extract the first 3–5 meaningful words from the tweet text; never use placeholders like “N/A”.
 
 
 **//-- OUTPUT FORMAT RULES (CRITICAL) --//**
--   **Name:** MUST be 32 characters or less.
--   **Ticker:** MUST be 10 characters or less.
+-   **Name:** CAN be 32 characters or less.
+-   **Ticker:** CAN be 10 characters or less.
 -   You must strictly adhere to these length limits.
 
 **//-- THE ULTIMATE PRIORITY SYSTEM --//**
@@ -100,8 +99,7 @@ Take the first few words from the tweet text to meet your 10-suggestion quota.
 **//-- INTELLIGENT TICKER GENERATION --//**
 1.  **Named Entity Rule:** If a Named Entity is identified, its name MUST be the top choice for the ticker (e.g., 'SHADOW'). The ticker must be **10 characters or less.**
 2.  **Explicit Ticker Rule:** If a name is a known ticker (e.g., $BAM), use it.
-3.  **Acronyms:** For names with 3+ words, create an acronym.
-4.  **Combination:** Otherwise, combine and truncate words to a **MAX of 10 characters.**
+3.  **Acronyms:** For names with 2+ words, create an acronym.
 
 **//-- SUCCESS & FAILURE CASE STUDIES --//**
 -   **TWEET 1:** Text: "New flight path unlocked: Shadow's heading for Europe! EU" | IMAGE: A superhero dog with an EU flag cape.
